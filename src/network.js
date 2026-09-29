@@ -12,10 +12,12 @@ export class NetworkRoom {
         this.token = '';
         this.playerId = '';
         this.seq = 0;
+        this.pendingCommands = [];
         this.ack = 0;
         this.pollTimer = 0;
         this.error = '';
         this.remote = new Map();
+        this.syncing = false;
     }
 
     async request(action, payload = {}) {
@@ -78,52 +80,56 @@ export class NetworkRoom {
     sendCommand(command) {
         if (!this.active || this.host) return;
         command.seq = ++this.seq;
-        this.pendingCommand = command;
+        this.pendingCommands.push(command);
     }
 
     update(delta) {
-        if (!this.active) return;
+        if (!this.active || this.syncing) return;
         this.pollTimer -= delta;
         if (this.pollTimer > 0) return;
-        this.pollTimer = 0.12;
-        this.sync().catch(error => { this.error = error.message; this.game.showRoomError(this.error); });
+        this.pollTimer = this.game.state === 'MENU' ? 0.5 : 0.05;
+        this.syncing = true;
+        this.sync().catch(error => { this.error = error.message; this.game.showRoomError(this.error); })
+            .finally(() => { this.syncing = false; });
     }
 
     async sync() {
         const local = this.game.player;
         const body = {
             ...this.auth(),
+            character: local.characterId,
             input: { position: local.position.toArray(), aim: local.aimYaw, revive: !!local.reviveRequested,
                 moving: local.velocity.lengthSq() > 0.1 },
             ack: this.ack
         };
         local.reviveRequested = false;
         if (this.host) body.snapshot = this.game.makeCoopSnapshot();
-        else if (this.pendingCommand) {
-            body.commands = [this.pendingCommand];
-            this.pendingCommand = null;
-        }
+        else body.commands = this.pendingCommands.slice(0, 30);
         const data = await this.request('sync', body);
+        if (body.commands?.length) this.pendingCommands = this.pendingCommands.filter(c => c.seq > body.commands.at(-1).seq);
+        this.updateRoster(data.players || []);
+        this.game.showRoomState(data);
         if (this.host) {
             this.applyInputs(data.inputs || {});
             this.ack = data.commands?.at(-1)?.id || this.ack;
             this.applyCommands(data.commands || []);
-        } else if (data.started && this.game.state !== 'PLAYING') {
+        } else if (data.started && data.epoch !== this.epoch) {
+            this.epoch = data.epoch;
             this.game.startGame(true);
             if (data.snapshot) this.game.applyCoopSnapshot(data.snapshot, this.playerId);
         } else if (data.snapshot) {
             this.game.applyCoopSnapshot(data.snapshot, this.playerId);
         }
-        this.updateRoster(data.players || []);
     }
 
     applyInputs(inputs) {
         for (const [id, input] of Object.entries(inputs)) {
             if (id === this.playerId) continue;
             const player = this.game.getCoopPlayer(id);
-            if (!player || !input) continue;
+            if (!player || !Array.isArray(input?.position)) continue;
             player.position.fromArray(input.position);
             player.aimYaw = input.aim;
+            player.moving = !!input.moving;
             if (input.revive) this.game.reviveNearest(player);
         }
     }
@@ -132,13 +138,25 @@ export class NetworkRoom {
         for (const item of commands) {
             const player = this.game.getCoopPlayer(item.player);
             const command = item.command || {};
-            if (!player || !command) continue;
-            if (command.type === 'reload') this.game.weapons.reload();
-            if (command.type === 'switch') this.game.weapons.switchWeapon(command.slot);
-            if (command.type === 'shoot' && Array.isArray(command.target)) {
-                const origin = player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-                this.game.weapons.shoot(origin, new THREE.Vector3().fromArray(command.target), !!command.ads, true);
+            if (!player || player.isDead || !player.weapons || item.id <= (player.lastCommandId || 0)) continue;
+            player.lastCommandId = item.id;
+            (player.commandQueue ||= []).push(command);
+        }
+    }
+
+    processCommands(player) {
+        const queue = player.commandQueue || [];
+        if (player.isDead) { queue.length = 0; return; }
+        while (queue.length) {
+            const command = queue[0];
+            if (command.type === 'shoot' && (player.weapons.fireCooldown > 0 || player.weapons.isReloading)) break;
+            queue.shift();
+            if (command.type === 'reload') player.weapons.reload();
+            if (command.type === 'switch') player.weapons.switchWeapon(command.slot);
+            if (command.type === 'shoot' && Array.isArray(command.target) && command.target.length === 3 && command.target.every(Number.isFinite)) {
+                player.weapons.shoot(player.position.clone().add(new THREE.Vector3(0, 1.2, 0)), new THREE.Vector3().fromArray(command.target), !!command.ads, true);
             }
+            player.processedSeq = command.seq;
         }
     }
 
@@ -170,12 +188,31 @@ export function makeRemotePlayer(scene, loader, id, name, characterId = 'soldier
     const healthBar = new HealthBar3D(scene, { width: 1.25, offsetY: 2.15, color: 0x44ddff });
     let characterModel = null;
     let loadingCharacter = null;
+    let mixer = null;
+    let actions = {};
+    let action = null;
+    let disposed = false;
+    let initialized = false;
     const remote = { id, name, characterId: normalizeCharacter(characterId), position: new THREE.Vector3(0, 0, 8), velocity: new THREE.Vector3(), aimYaw: Math.PI,
         isDead: false, isDowned: false, health: 100, maxHealth: 100, shield: 100, maxShield: 100,
         radius: 0.55, height: 1.6, mesh: group, healthBar,
-        updateVisual() { group.position.copy(this.position); group.visible = !this.isDead; healthBar.update(this.position, this.health, this.maxHealth, true); },
+        updateVisual(delta = 1 / 60) {
+            const blend = 1 - Math.exp(-12 * delta);
+            if (!initialized || group.position.distanceTo(this.position) > 12) { group.position.copy(this.position); initialized = true; }
+            else group.position.lerp(this.position, blend);
+            const angle = Math.atan2(Math.sin(this.aimYaw - group.rotation.y), Math.cos(this.aimYaw - group.rotation.y));
+            group.rotation.y += angle * blend;
+            group.visible = !this.isDead || this.isDowned;
+            const next = actions[this.moving && !this.isDead ? 'walk' : 'idle'];
+            if (next && action !== next) { action?.fadeOut(0.15); next.reset().fadeIn(0.15).play(); action = next; }
+            mixer?.update(delta);
+            this.weapons?.updateEquippedMesh();
+            healthBar.update(group.position, this.health, this.maxHealth, group.visible);
+        },
         checkHit(start, end, ray) { const hit = ray.intersectBox(new THREE.Box3(this.position.clone().add(new THREE.Vector3(-.55, 0, -.55)), this.position.clone().add(new THREE.Vector3(.55, 1.6, .55))), new THREE.Vector3()); return hit ? { hit: true, point: hit } : { hit: false }; },
         takeDamage(amount) { this.health -= amount; if (this.health <= 0) { this.health = 0; this.isDead = true; this.isDowned = true; } },
+        heal(amount) { this.health = Math.min(this.maxHealth, this.health + amount); },
+        rechargeShield(amount) { this.shield = Math.min(this.maxShield, this.shield + amount); },
         revive() { if (!this.isDowned) return false; this.health = 60; this.isDowned = false; this.isDead = false; return true; },
         setCharacter(nextCharacter) {
             const next = normalizeCharacter(nextCharacter);
@@ -186,7 +223,9 @@ export function makeRemotePlayer(scene, loader, id, name, characterId = 'soldier
             loadingCharacter = next;
             loader.load(`assets/models/${config.modelFile}`, gltf => {
                 loadingCharacter = null;
-                if (remote.characterId !== next) return;
+                if (disposed || remote.characterId !== next) return;
+                mixer?.stopAllAction();
+                if (characterModel) mixer?.uncacheRoot(characterModel);
                 characterModel?.removeFromParent();
                 characterModel = SkeletonUtils.clone(gltf.scene);
                 characterModel.scale.set(1.7, 1.7, 1.7);
@@ -197,9 +236,19 @@ export function makeRemotePlayer(scene, loader, id, name, characterId = 'soldier
                 });
                 body.visible = false;
                 group.add(characterModel);
+                mixer = new THREE.AnimationMixer(characterModel);
+                actions = {}; action = null;
+                for (const source of gltf.animations || []) {
+                    const clip = source.clone();
+                    if (['idle', 'walk'].includes(clip.name)) clip.tracks = clip.tracks.filter(t => !t.name.includes('arm-right'));
+                    actions[clip.name] = mixer.clipAction(clip);
+                }
+                actions['holding-right']?.play();
+                const hand = characterModel.getObjectByName('arm-right');
+                if (hand) remote.weapons?.attachToArm(hand);
             }, undefined, () => { if (loadingCharacter === next) loadingCharacter = null; });
         },
-        dispose() { group.removeFromParent(); healthBar.dispose(); characterModel?.traverse(child => child.isMesh && child.material?.dispose()); }
+        dispose() { disposed = true; mixer?.stopAllAction(); this.weapons?.clear(); group.removeFromParent(); healthBar.dispose(); }
     };
     remote.setCharacter(characterId);
     return remote;

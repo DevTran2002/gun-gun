@@ -505,6 +505,33 @@ body, html {
 .room-actions .btn-toggle { flex: 1; padding: 7px 6px; font-size: 11px; }
 .room-status { color: #b4bdcc; min-height: 30px; margin-top: 8px; font: 500 12px/1.4 var(--font-body); }
 .room-start { padding: 8px 14px; font-size: 12px; }
+.party-menu .menu-box { max-width: 1120px; padding: 24px 30px; }
+.party-menu .mutation-guide, .party-menu .loot-guide, .party-menu .controls-guide, .party-menu .highscore-badge { display: none; }
+.party-menu .game-logo { font-size: 28px; }
+.party-menu .game-sublogo { margin-bottom: 12px; }
+.party-menu .room-panel { border: 0; padding: 0; background: transparent; }
+.party-menu #room-name, .party-menu .room-actions { display: none; }
+.party-menu .character-options { max-width: 420px; margin: 8px auto; }
+.lobby-stage { height: clamp(280px, 46vh, 510px); position: relative; border-radius: 16px; overflow: hidden; border: 2px solid #d59434; }
+.lobby-stage canvas { display: block; width: 100%; height: 100%; }
+.lobby-labels { position: absolute; bottom: 15px; left: 4%; right: 4%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.lobby-nameplate { color: #fff; background: #493258e8; border: 1px solid #9074a5; border-radius: 8px; padding: 8px 4px; font: 600 12px/1.4 sans-serif; overflow-wrap: anywhere; }
+.lobby-nameplate strong, .lobby-nameplate small { display: block; }
+.lobby-nameplate small { color: #ffe296; font-size: 9px; margin-top: 3px; }
+.party-menu .room-start { float: right; margin-top: 16px; padding: 16px 32px; font-size: 18px; background: linear-gradient(#ffe38a, #efac37); color: #30273a; }
+.weapon-slot img { object-fit: contain; width: 38px; height: 29px; top: 2px; right: 1px; image-rendering: auto; }
+.lobby-heading { margin: 16px 0 10px; color: #e6faff; font: 700 12px/1.5 var(--font-heading); }
+.lobby-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin-bottom: 14px; }
+.lobby-player { min-width: 0; padding: 8px 4px 12px; border: 1px solid #315068; border-radius: 9px; background: linear-gradient(180deg, #19293a, #0c1420); display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.lobby-role { font: 700 9px/1.5 sans-serif; color: var(--character-color, #8ba0b8); }
+.lobby-portrait { width: 100%; height: 130px; display: grid; place-items: center; font: 11px sans-serif; color: #9cafc5; background: radial-gradient(ellipse at 50% 85%, #34556a 0%, transparent 65%); }
+.lobby-portrait img { width: 100%; height: 100%; object-fit: contain; }
+.lobby-player strong { max-width: 100%; overflow-wrap: anywhere; color: #fff; font: 700 12px/1.4 sans-serif; }
+.lobby-player small { color: var(--character-color); font: 600 9px/1.4 sans-serif; }
+.lobby-player.empty { justify-content: center; border-style: dashed; color: #8093aa; font: 11px sans-serif; background: #0d1620; min-height: 200px; }
+.lobby-empty-icon { font: 300 36px sans-serif; color: #496379; }
+.room-panel button:disabled { opacity: .45; cursor: default; }
+@media (max-width: 580px) { .lobby-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 
 .weapon-name {
     font-family: var(--font-heading);
@@ -611,6 +638,8 @@ body, html {
 }
 
 .menu-box {
+    max-height: calc(100dvh - 24px);
+    overflow-y: auto;
     background: var(--bg-dark);
     border: 1px solid var(--border-light);
     border-radius: 12px;

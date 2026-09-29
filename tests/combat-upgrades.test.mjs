@@ -13,7 +13,54 @@ const { WeaponSystem, WEAPON_CONFIGS, RARE_WEAPON_CONFIGS } = await import('../s
 const { Zombie, WaveManager } = await import('../src/enemies.js');
 const { PickupManager, DROP_TYPES } = await import('../src/pickups.js');
 const { Arena } = await import('../src/arena.js');
+const { NetworkRoom, makeRemotePlayer } = await import('../src/network.js');
 const particles = { createImpactSparks() {}, createMuzzleFlash() {}, createExplosion() {} };
+
+test('two players shoot independently and queued guest commands are not lost or replayed', () => {
+    const { scene, weapons: hostWeapons, arena, player } = fixture();
+    const guest = makeRemotePlayer(scene, null, 'guest', 'Guest');
+    guest.weapons = new WeaponSystem(scene, null, particles);
+    guest.weapons.resetRun();
+    const network = new NetworkRoom({ getCoopPlayer: () => guest });
+    const command = { id: 1, player: 'guest', command: { seq: 1, type: 'shoot', target: [0, 1, 20] } };
+    hostWeapons.shoot(new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 1, 20));
+    network.applyCommands([command]);
+    network.processCommands(guest);
+    assert.equal(hostWeapons.ammo.blaster, 15);
+    assert.equal(guest.weapons.ammo.blaster, 15);
+    network.applyCommands([command]);
+    network.applyCommands([{ id: 2, player: 'guest', command: { seq: 2, type: 'shoot', target: [0, 1, 20] } }]);
+    network.processCommands(guest);
+    assert.equal(guest.commandQueue.length, 1);
+    guest.weapons.update(0.25, arena, [], player);
+    network.processCommands(guest);
+    assert.equal(guest.weapons.ammo.blaster, 14);
+    assert.equal(hostWeapons.ammo.blaster, 15);
+    assert.equal(guest.processedSeq, 2);
+    guest.dispose();
+});
+
+test('client cooldown advances, gun predictions repeat, and remote models interpolate', () => {
+    const { scene, weapons, arena } = fixture();
+    const network = new NetworkRoom({});
+    network.active = true;
+    weapons.onCommand = c => network.sendCommand(c);
+    const origin = new THREE.Vector3(0, 1, 0), target = new THREE.Vector3(0, 1, 20);
+    assert.equal(weapons.shoot(origin, target), true);
+    weapons.update(0.25, arena, [], []);
+    assert.equal(weapons.shoot(origin, target), true);
+    assert.equal(network.pendingCommands.length, 2);
+    assert.equal(weapons.ammo.blaster, 14);
+    const remote = makeRemotePlayer(scene, null, 'other', 'Other');
+    remote.updateVisual(1 / 60);
+    const before = remote.mesh.position.x;
+    remote.position.x = 4;
+    remote.updateVisual(1 / 60);
+    assert.ok(remote.mesh.position.x > before && remote.mesh.position.x < 4);
+    for (let i = 0; i < 60; i++) remote.updateVisual(1 / 60);
+    assert.ok(Math.abs(remote.mesh.position.x - 4) < 0.001);
+    remote.dispose();
+});
 
 function fixture() {
     const scene = new THREE.Scene();

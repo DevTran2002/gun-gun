@@ -10,6 +10,7 @@ import { PickupManager } from './pickups.js';
 import { UIManager } from './ui.js';
 import { NetworkRoom, makeRemotePlayer } from './network.js';
 import { normalizeCharacter } from './characters.js';
+import { RoomLobby } from './lobby.js';
 
 class CyberArenaGame {
     constructor() {
@@ -24,6 +25,7 @@ class CyberArenaGame {
         this.clock = new THREE.Clock();
         this.network = new NetworkRoom(this);
         this.remotePlayers = new Map();
+        this.remoteProjectiles = new Map();
 
         this.initThree();
         this.initSubsystems();
@@ -92,6 +94,7 @@ class CyberArenaGame {
         this.btnRestartPause = document.getElementById('btn-restart-pause');
         this.btnRestartOver = document.getElementById('btn-restart-gameover');
         this.roomName = document.getElementById('room-name');
+        this.roomLobby = new RoomLobby(document.getElementById('room-lobby'), this.gltfLoader);
         this.roomCode = document.getElementById('room-code');
         this.roomStatus = document.getElementById('room-status');
         this.roomStart = document.getElementById('room-start');
@@ -208,6 +211,10 @@ class CyberArenaGame {
         this.currentWave = 1;
         this.nextWaveTimer = 0;
         this.weapons.resetRun();
+        for (const remote of this.remotePlayers.values()) {
+            remote.weapons.resetRun(); remote.health = remote.maxHealth; remote.shield = remote.maxShield;
+            remote.isDead = false; remote.isDowned = false; remote.commandQueue = [];
+        }
         this.player.reset();
         this.pickups.clear();
         this.particles.clear();
@@ -221,6 +228,7 @@ class CyberArenaGame {
     }
 
     pauseGame() {
+        if (this.network.active) return;
         this.state = 'PAUSED';
         this.player.setInputEnabled(false);
         if (this.screenPause) this.screenPause.style.display = 'flex';
@@ -297,11 +305,18 @@ class CyberArenaGame {
     showRoomError(message) { if (this.roomStatus) this.roomStatus.textContent = message; }
 
     showRoomState(data) {
+        this.roomLobby?.update(data);
+        this.screenMenu?.classList.add('party-menu');
         if (!this.roomStatus) return;
         const names = (data.players || []).map(player => player.name).join(', ');
         this.roomStatus.textContent = `PHÒNG ${data.code}: ${names}${data.host === data.you ? ' • Bấm BẮT ĐẦU PHÒNG' : ' • Chờ chủ phòng'}`;
         if (this.roomCode) this.roomCode.value = data.code;
         if (this.roomStart) this.roomStart.style.display = data.host === data.you ? 'inline-block' : 'none';
+        if (this.roomStart) this.roomStart.disabled = (data.players || []).length < 2 || data.started;
+        this.characterOptions?.forEach(option => { option.disabled = !!data.started; });
+        if (this.roomCreate) this.roomCreate.disabled = true;
+        if (this.roomJoin) this.roomJoin.disabled = true;
+        if (this.btnStart) this.btnStart.style.display = 'none';
     }
 
     ensureCoopPlayer(id, name, character = 'soldier') {
@@ -313,6 +328,9 @@ class CyberArenaGame {
             return remote;
         }
         const remote = makeRemotePlayer(this.scene, this.gltfLoader, id, name, character);
+        remote.weapons = new WeaponSystem(this.scene, this.gltfLoader, this.particles);
+        remote.weapons.models = this.weapons.models;
+        remote.weapons.resetRun();
         this.remotePlayers.set(id, remote);
         this.coopPlayers.push(remote);
         return remote;
@@ -342,18 +360,46 @@ class CyberArenaGame {
 
     makeCoopSnapshot() {
         return { state: this.state, wave: this.currentWave, score: this.score,
-            players: this.coopPlayers.map(player => ({ id: player.id || this.network.playerId, name: player.name || 'Bạn', character: player.characterId || this.characterId, position: player.position.toArray(), health: player.health, shield: player.shield, isDead: player.isDead, isDowned: player.isDowned, aim: player.aimYaw })),
+            projectiles: this.coopPlayers.flatMap(player => (player.weapons?.projectiles || []).filter(p => p.mesh).map(p => ({ id: `${player.id || this.network.playerId}:${p.id}`, owner: player.id || this.network.playerId, position: p.mesh.position.toArray(), direction: p.direction.toArray(), speed: p.speed, color: p.color }))),
+            players: this.coopPlayers.map(player => ({ id: player.id || this.network.playerId, name: player.name || 'Bạn', character: player.characterId || this.characterId, position: player.position.toArray(), health: player.health, shield: player.shield, isDead: player.isDead, isDowned: player.isDowned, aim: player.aimYaw, moving: player === this.player ? player.velocity.lengthSq() > 0.1 : player.moving, weapons: player.weapons?.getNetworkState(), processedSeq: player.processedSeq || 0 })),
             enemies: this.waveManager.enemies.filter(enemy => !enemy.isDead).map(enemy => ({ id: enemy.id, type: enemy.type, position: enemy.position.toArray(), health: enemy.health, maxHealth: enemy.maxHealth })),
             pickups: this.pickups.pickups.map(pickup => ({ id: pickup.id, type: pickup.type, position: pickup.mesh.position.toArray(), weaponSlot: pickup.weaponSlot, life: pickup.life })) };
     }
 
     applyCoopSnapshot(snapshot, localId) {
+        const projectileIds = new Set();
+        for (const state of snapshot.projectiles || []) {
+            if (state.owner === localId) continue;
+            projectileIds.add(state.id);
+            let projectile = this.remoteProjectiles.get(state.id);
+            if (!projectile) {
+                const mesh = new THREE.Mesh(this.weapons.bulletGeo, new THREE.MeshBasicMaterial({ color: state.color }));
+                this.scene.add(mesh);
+                projectile = { mesh, direction: new THREE.Vector3() };
+                this.remoteProjectiles.set(state.id, projectile);
+            }
+            projectile.mesh.position.fromArray(state.position);
+            projectile.direction.fromArray(state.direction);
+            projectile.mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), projectile.direction);
+            projectile.speed = state.speed;
+        }
+        for (const [id, projectile] of this.remoteProjectiles) {
+            if (!projectileIds.has(id)) { projectile.mesh.removeFromParent(); projectile.mesh.material.dispose(); this.remoteProjectiles.delete(id); }
+        }
         this.currentWave = snapshot.wave ?? this.currentWave;
+        this.score = snapshot.score ?? this.score;
         for (const state of snapshot.players || []) {
-            if (state.id === localId) continue;
+            if (state.id === localId) {
+                this.player.health = state.health; this.player.shield = state.shield;
+                this.player.isDead = state.isDead; this.player.isDowned = state.isDowned;
+                if (state.processedSeq >= this.network.seq) this.weapons.applyNetworkState(state.weapons);
+                continue;
+            }
             const remote = this.ensureCoopPlayer(state.id, state.name, state.character);
             remote.position.fromArray(state.position); remote.health = state.health; remote.shield = state.shield;
-            remote.isDead = state.isDead; remote.isDowned = state.isDowned; remote.updateVisual();
+            remote.isDead = state.isDead; remote.isDowned = state.isDowned;
+            remote.aimYaw = state.aim; remote.moving = !!state.moving;
+            remote.weapons.applyNetworkState(state.weapons);
         }
         const byId = new Map(this.waveManager.enemies.map(enemy => [enemy.id, enemy]));
         const snapshotEnemyIds = new Set((snapshot.enemies || []).map(enemy => enemy.id));
@@ -364,7 +410,7 @@ class CyberArenaGame {
                 enemy.id = state.id;
                 this.waveManager.enemies.push(enemy);
             }
-            enemy.position.fromArray(state.position); enemy.health = state.health; enemy.mesh?.position.copy(enemy.position);
+            enemy.position.fromArray(state.position); enemy.health = state.health;
         }
         for (let i = this.waveManager.enemies.length - 1; i >= 0; i--) {
             if (!snapshotEnemyIds.has(this.waveManager.enemies[i].id)) {
@@ -416,7 +462,7 @@ class CyberArenaGame {
                 this.reviveTeammate(downed, this.player);
                 this.player.reviveRequested = false;
             }
-            for (const player of this.remotePlayers.values()) player.updateVisual();
+            for (const player of this.remotePlayers.values()) player.updateVisual(delta);
             // Player Damage Flash / Game Over check
             if (this.player.isDead && (!this.network.active || this.coopPlayers.every(player => player.isDead)) && this.state !== 'GAMEOVER') {
                 this.gameOver();
@@ -426,6 +472,19 @@ class CyberArenaGame {
             if (!this.network.active || this.network.host) {
                 this.weapons.update(delta, this.arena, this.waveManager.enemies, this.coopPlayers,
                     (dmg, crit, pt) => this.onHitEnemy(dmg, crit, pt));
+                for (const remote of this.remotePlayers.values()) {
+                    this.network.processCommands(remote);
+                    remote.weapons.update(delta, this.arena, this.waveManager.enemies, this.coopPlayers);
+                }
+            } else {
+                // Client prediction: animate shots and tick cooldowns without applying damage.
+                this.weapons.update(delta, this.arena, [], []);
+                for (const projectile of this.remoteProjectiles.values()) projectile.mesh.position.addScaledVector(projectile.direction, projectile.speed * delta);
+                for (const enemy of this.waveManager.enemies) {
+                    enemy.mesh?.position.lerp(enemy.position, 1 - Math.exp(-12 * delta));
+                    enemy.mixer?.update(delta);
+                    enemy.healthBar?.update(enemy.mesh?.position || enemy.position, enemy.health, enemy.maxHealth, !enemy.isDead);
+                }
             }
 
             // Update Infinite Phases & Zombies
@@ -456,6 +515,7 @@ class CyberArenaGame {
         }
 
         // Render 3D Scene
+        if (this.state === 'MENU') this.roomLobby?.render(delta);
         this.renderer.render(this.scene, this.camera);
     }
 }

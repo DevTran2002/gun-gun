@@ -5,7 +5,8 @@ export const WEAPON_CONFIGS = [
     {
         id: 'blaster',
         name: 'BLASTER-X',
-        modelFile: 'blaster.glb',
+        modelFile: 'kenney-blaster/blaster-a.glb',
+        icon: 'assets/previews/kenney-blaster/blaster-a.png',
         fireRate: 0.20,
         damage: 26,
         critMultiplier: 2.0,
@@ -18,14 +19,15 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 1,
         recoilPitch: 0.025,
-        scale: 0.11,
+        scale: 0.24,
         offset: new THREE.Vector3(-0.24, -0.05, 0.02),
         rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     },
     {
         id: 'repeater',
         name: 'REPEATER-9',
-        modelFile: 'blaster-repeater.glb',
+        modelFile: 'kenney-blaster/blaster-d.glb',
+        icon: 'assets/previews/kenney-blaster/blaster-d.png',
         fireRate: 0.10,
         damage: 16,
         critMultiplier: 2.0,
@@ -38,14 +40,15 @@ export const WEAPON_CONFIGS = [
         isAuto: true,
         pellets: 1,
         recoilPitch: 0.018,
-        scale: 0.12,
+        scale: 0.24,
         offset: new THREE.Vector3(-0.24, -0.05, 0.02),
         rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     },
     {
         id: 'scatter',
         name: 'SCATTER-V',
-        modelFile: 'blaster.glb',
+        modelFile: 'kenney-blaster/blaster-g.glb',
+        icon: 'assets/previews/kenney-blaster/blaster-g.png',
         fireRate: 0.62,
         damage: 13,
         critMultiplier: 1.8,
@@ -58,7 +61,7 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 6,
         recoilPitch: 0.06,
-        scale: 0.12,
+        scale: 0.24,
         offset: new THREE.Vector3(-0.24, -0.05, 0.02),
         rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     }
@@ -101,6 +104,7 @@ export class WeaponSystem {
 
         // Active projectiles
         this.projectiles = [];
+        this.nextProjectileId = 1;
 
         // Projectile reusable geometry
         this.bulletGeo = new THREE.CylinderGeometry(0.04, 0.04, 0.6, 6);
@@ -122,10 +126,7 @@ export class WeaponSystem {
             }, undefined, () => resolve());
         });
 
-        await Promise.all([
-            loadModel('blaster.glb'),
-            loadModel('blaster-repeater.glb')
-        ]);
+        await Promise.all([...new Set(WEAPON_CONFIGS.map(w => w.modelFile))].map(loadModel));
 
         this.resetRun();
     }
@@ -146,6 +147,25 @@ export class WeaponSystem {
     }
 
     get damageBoost() { return 1 + this.upgrades.damage * 0.2; }
+    getNetworkState() {
+        return { gun: this.weaponSlots[0].id, slot: this.currentSlotIndex, ammo: { ...this.ammo }, reserve: { ...this.reserve },
+            upgrades: { ...this.upgrades }, isReloading: this.isReloading, reloadTimer: this.reloadTimer };
+    }
+
+    applyNetworkState(state) {
+        if (!state) return;
+        const gun = [...WEAPON_CONFIGS, ...RARE_WEAPON_CONFIGS].find(w => w.id === state.gun) || WEAPON_CONFIGS[0];
+        const changed = this.weaponSlots[0]?.id !== gun.id;
+        this.weaponSlots = [gun, KNIFE_CONFIG];
+        this.currentSlotIndex = state.slot === 1 ? 1 : 0;
+        this.ammo = { ...state.ammo };
+        this.reserve = { ...state.reserve };
+        this.upgrades = { ...state.upgrades };
+        this.isReloading = !!state.isReloading;
+        this.reloadTimer = state.reloadTimer || 0;
+        if (changed && this.handNode) this.attachToArm(this.handNode);
+        this.updateEquippedMesh();
+    }
     get fireRateBoost() { return 1 + this.upgrades.rapid * 0.125; }
     get beamCount() { return 1 + this.upgrades.multishot * 2; }
 
@@ -195,7 +215,7 @@ export class WeaponSystem {
 
     switchWeapon(index) {
         if (index < 0 || index >= this.weaponSlots.length || index === this.currentSlotIndex) return;
-        if (this.onCommand) { this.onCommand({ type: 'switch', slot: index }); return; }
+        if (this.onCommand) this.onCommand({ type: 'switch', slot: index });
         this.currentSlotIndex = index;
         this.isReloading = false;
         this.reloadTimer = 0;
@@ -214,10 +234,10 @@ export class WeaponSystem {
     }
 
     reload() {
-        if (this.onCommand) { this.onCommand({ type: 'reload' }); return; }
         const w = this.getCurrentWeapon();
         if (w.isKnife) return;
         if (this.isReloading || this.ammo[w.id] >= w.magSize || !this.reserve[w.id]) return;
+        if (this.onCommand) this.onCommand({ type: 'reload' });
         this.isReloading = true;
         this.reloadTimer = w.reloadTime;
         sounds.play('switchWeapon', { volume: 0.6, rate: 1.2 });
@@ -312,8 +332,10 @@ export class WeaponSystem {
             if (this.fireCooldown > 0 || this.isReloading) return false;
             if (!current.isKnife && this.ammo[current.id] <= 0) { this.reload(); return false; }
             this.onCommand({ type: 'shoot', target: targetPoint.toArray(), ads: isADS });
-            this.fireCooldown = current.fireRate / this.fireRateBoost;
-            return true;
+            const send = this.onCommand;
+            this.onCommand = null;
+            try { return this.shoot(origin, targetPoint, isADS, isPlayer, damageMultiplier); }
+            finally { this.onCommand = send; }
         }
         const w = this.getCurrentWeapon();
         if (this.isReloading) return false;
@@ -374,6 +396,7 @@ export class WeaponSystem {
 
             this.projectiles.push({
                 mesh: bulletMesh,
+                id: this.nextProjectileId++,
                 direction: dir,
                 speed: w.bulletSpeed,
                 damage: w.damage * damageMultiplier * (isPlayer ? this.damageBoost : 1),
@@ -412,6 +435,7 @@ export class WeaponSystem {
 
         this.projectiles.push({
             mesh: bulletMesh,
+            id: this.nextProjectileId++,
             direction: dir,
             speed: speed,
             damage: damage,

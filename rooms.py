@@ -101,6 +101,9 @@ class RoomService:
                 return self.public(room, player)
             if action != 'sync':
                 raise RoomError('Yêu cầu không hợp lệ.', 404)
+            character = data.get('character')
+            if not room['started'] and isinstance(character, str) and character in CHARACTERS:
+                player['character'] = character
             incoming = data.get('input')
             if isinstance(incoming, dict):
                 pos = incoming.get('position')

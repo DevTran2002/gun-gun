@@ -96,6 +96,11 @@ export class UIManager {
                 if (!weapon) return;
                 slot.classList.toggle('rare', !!weapon.tier);
                 slot.title = weapon.name;
+                const icon = slot.querySelector('img');
+                if (icon && weapon.icon && icon.getAttribute('src') !== weapon.icon) {
+                    icon.src = weapon.icon;
+                    icon.alt = weapon.name;
+                }
                 if (idx === player.weapons.currentSlotIndex) {
                     slot.classList.add('active');
                 } else {
