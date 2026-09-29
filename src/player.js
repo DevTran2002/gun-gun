@@ -134,6 +134,11 @@ export class PlayerController {
         this.characterId = normalizeCharacter(characterId);
         this.loader = loader;
         this.scene = scene;
+        this.handBone = null;
+        this.mixer = null;
+        this.animations = {};
+        this.currentAction = null;
+        this.holdingAction = null;
         return new Promise((resolve) => {
             if (this.model) {
                 this.model.removeFromParent();
@@ -156,6 +161,11 @@ export class PlayerController {
                         this.handBone = child;
                     }
                 });
+                if (!this.handBone) {
+                    this.handBone = this.model.getObjectByName('hand-right')
+                        || this.model.getObjectByName('hand')
+                        || this.model;
+                }
 
                 scene.add(this.model);
                 this.healthBar = new HealthBar3D(scene, { width: 1.35, offsetY: 2.35, color: 0x22e6a5 });

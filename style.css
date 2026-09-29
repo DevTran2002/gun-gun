@@ -489,6 +489,17 @@ body, html {
 .room-title { color: var(--cyan); font: 700 12px/1.4 var(--font-heading); letter-spacing: 1px; margin-bottom: 8px; }
 .room-panel input { height: 32px; border: 1px solid #315068; border-radius: 4px; background: #111a26; color: #fff; padding: 0 9px; font: 600 13px var(--font-body); }
 #room-name { width: 100%; margin-bottom: 8px; }
+.character-label { color: #8fa3b9; font: 700 10px/1.2 var(--font-heading); letter-spacing: 1px; margin: 4px 0 6px; }
+.character-options { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 9px; }
+.character-option { min-height: 56px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 5px 3px; border: 1px solid #294054; border-radius: 5px; background: #111a26; color: #aab8c9; cursor: pointer; font: 700 9px/1.1 var(--font-body); }
+.character-option:hover { border-color: var(--cyan); color: #fff; }
+.character-option.selected { border-color: var(--cyan); color: #fff; background: rgba(0, 240, 255, .14); box-shadow: 0 0 8px rgba(0, 240, 255, .22); }
+.character-silhouette { width: 23px; height: 28px; display: block; position: relative; border-radius: 45% 45% 35% 35%; background: currentColor; opacity: .9; }
+.character-silhouette::after { content: ''; position: absolute; width: 31px; height: 7px; left: -4px; bottom: 4px; border-radius: 5px; background: currentColor; }
+.skeleton-silhouette { color: #ffe06a; background: transparent; border: 3px solid currentColor; }
+.skeleton-silhouette::after { background: currentColor; height: 4px; bottom: 2px; }
+.vampire-silhouette { color: #ff5577; border-radius: 50% 50% 30% 30%; }
+.vampire-silhouette::before { content: ''; position: absolute; width: 31px; height: 9px; left: -4px; top: -2px; border-radius: 50% 50% 0 0; background: currentColor; }
 .room-actions { display: flex; gap: 6px; }
 #room-code { width: 84px; text-transform: uppercase; }
 .room-actions .btn-toggle { flex: 1; padding: 7px 6px; font-size: 11px; }

@@ -9,7 +9,7 @@ import { WaveManager, Zombie } from './enemies.js';
 import { PickupManager } from './pickups.js';
 import { UIManager } from './ui.js';
 import { NetworkRoom, makeRemotePlayer } from './network.js';
-import { CHARACTER_CONFIGS, normalizeCharacter } from './characters.js';
+import { normalizeCharacter } from './characters.js';
 
 class CyberArenaGame {
     constructor() {

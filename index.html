@@ -163,6 +163,18 @@
             <div class="room-panel">
                 <div class="room-title">PHÒNG ONLINE • TỐI ĐA 4 NGƯỜI</div>
                 <input id="room-name" maxlength="24" placeholder="Tên của bạn" value="Người chơi">
+                <div class="character-label">CHỌN NHÂN VẬT</div>
+                <div class="character-options" role="group" aria-label="Chọn nhân vật">
+                    <button class="character-option selected" type="button" data-character="soldier" aria-pressed="true">
+                        <span class="character-silhouette soldier-silhouette"></span><span>LÍNH</span>
+                    </button>
+                    <button class="character-option" type="button" data-character="skeleton" aria-pressed="false">
+                        <span class="character-silhouette skeleton-silhouette"></span><span>KHUNG XƯƠNG</span>
+                    </button>
+                    <button class="character-option" type="button" data-character="vampire" aria-pressed="false">
+                        <span class="character-silhouette vampire-silhouette"></span><span>MA CÀ RỒNG</span>
+                    </button>
+                </div>
                 <div class="room-actions">
                     <button id="room-create" class="btn-toggle">TẠO PHÒNG</button>
                     <input id="room-code" maxlength="6" placeholder="MÃ PHÒNG">

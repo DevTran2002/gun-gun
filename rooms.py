@@ -5,6 +5,8 @@ import string
 import threading
 import time
 
+CHARACTERS = {'soldier', 'skeleton', 'vampire'}
+
 
 class RoomError(Exception):
     def __init__(self, message, status=400):
@@ -18,10 +20,13 @@ class RoomService:
         self.lock = threading.RLock()
         self.clock = clock
 
-    def member(self, name):
+    def member(self, name, character='soldier'):
         name = str(name).strip()[:24] or 'Đồng đội'
+        character = str(character).strip().lower()
+        if character not in CHARACTERS:
+            character = 'soldier'
         return dict(id=secrets.token_hex(6), token=secrets.token_urlsafe(24), name=name,
-                    seen=self.clock(), input={}, seq=0)
+                    character=character, seen=self.clock(), input={}, seq=0)
 
     def clean(self):
         now = self.clock()
@@ -43,8 +48,8 @@ class RoomService:
         return room, player
 
     def public(self, room, player):
-        return dict(code=room['code'], host=room['host'], you=player['id'], started=room['started'],
-                    epoch=room['epoch'], players=[dict(id=p['id'], name=p['name']) for p in room['players'].values()],
+        return dict(code=room['code'], host=room['host'], you=player['id'], character=player['character'], started=room['started'],
+                    epoch=room['epoch'], players=[dict(id=p['id'], name=p['name'], character=p['character']) for p in room['players'].values()],
                     snapshot=room['snapshot'],
                     inputs={p['id']: p['input'] for p in room['players'].values()} if player['id'] == room['host'] else {},
                     commands=list(room['commands']) if player['id'] == room['host'] else [])
@@ -59,7 +64,7 @@ class RoomService:
                 code = ''.join(secrets.choice(alphabet) for _ in range(6))
                 while code in self.rooms:
                     code = ''.join(secrets.choice(alphabet) for _ in range(6))
-                player = self.member(data.get('name', ''))
+                player = self.member(data.get('name', ''), data.get('character', 'soldier'))
                 room = dict(code=code, host=player['id'], players={player['id']: player}, started=False,
                             snapshot=None, epoch=0, commands=[], next_command=1)
                 self.rooms[code] = room
@@ -72,7 +77,7 @@ class RoomService:
                     raise RoomError('Trận đã bắt đầu. Hãy chờ chủ phòng tạo trận mới.', 409)
                 if len(room['players']) >= 4:
                     raise RoomError('Phòng đã đủ 4 người.', 409)
-                player = self.member(data.get('name', ''))
+                player = self.member(data.get('name', ''), data.get('character', 'soldier'))
                 room['players'][player['id']] = player
                 return {**self.public(room, player), 'token': player['token']}
             room, player = self.authorize(data)
