@@ -3,6 +3,11 @@ import { sounds } from './audio.js';
 import { HealthBar3D } from './healthbar.js';
 import { CHARACTER_CONFIGS, normalizeCharacter } from './characters.js';
 
+const _tempPlayerBox = new THREE.Box3();
+const _tempBoxMin = new THREE.Vector3();
+const _tempBoxMax = new THREE.Vector3();
+const _tempPlayerHitPoint = new THREE.Vector3();
+
 export class PlayerController {
     constructor(camera, domElement, arena, weaponSystem, bindInput = true, characterId = 'soldier') {
         this.camera = camera;
@@ -56,6 +61,12 @@ export class PlayerController {
         this.toggleBotRequested = false;
         this.isADS = false;
 
+        // Core Gunplay: Cursor Kickback & Screen Shake Trauma
+        this.cursorKick = new THREE.Vector2(0, 0);
+        this.screenShakeTrauma = 0;
+        this.painTimer = 0;
+        this.hydration = 100;
+
         // Input state
         this.keys = {};
         this.mouseButtons = { left: false, right: false };
@@ -77,14 +88,20 @@ export class PlayerController {
     initInput() {
         window.addEventListener('keydown', (e) => {
             if (!this.inputEnabled) return;
-            if (e.code === 'Space') e.preventDefault();
+            if (e.code === 'Space') {
+                e.preventDefault();
+                this.weapons.cancelReload(); // Reload cancel khi nhảy
+            }
             this.keys[e.code] = true;
 
             if (e.code === 'KeyR') {
                 this.weapons.reload();
             }
-            if (e.code === 'Digit1') this.weapons.switchWeapon(0);
-            if (e.code === 'Digit2') this.weapons.switchWeapon(1);
+            // Minimalist Survival Hotbar: [1] Súng chính, [2] Dao cận chiến, [3] Túi cứu thương (5s sơ cứu)
+            if (e.code === 'Digit1') this.weapons.switchWeapon(0, this);
+            if (e.code === 'Digit2' || e.code === 'KeyV') this.weapons.switchWeapon(1, this);
+            if (e.code === 'Digit3') this.weapons.startMedkitUse(this);
+
             if (e.code === 'KeyQ') this.tryDodge();
             if (e.code === 'KeyE') this.reviveRequested = true;
             if (e.code === 'KeyB') this.toggleBotRequested = true;
@@ -107,8 +124,8 @@ export class PlayerController {
 
         window.addEventListener('wheel', (e) => {
             if (!this.inputEnabled) return;
-            if (e.deltaY > 0) this.weapons.nextWeapon();
-            else if (e.deltaY < 0) this.weapons.prevWeapon();
+            if (e.deltaY > 0) this.weapons.nextWeapon(this);
+            else if (e.deltaY < 0) this.weapons.prevWeapon(this);
         });
 
         window.addEventListener('mousemove', (e) => {
@@ -227,6 +244,9 @@ export class PlayerController {
     tryDodge() {
         if (this.dodgeCooldown > 0 || this.isDead || !this.isGrounded) return;
 
+        // Reload cancel khi né đòn
+        this.weapons.cancelReload();
+
         const moveDir = this.getMovementInput();
         if (moveDir.lengthSq() > 0.01) {
             this.dodgeDir.copy(moveDir).normalize();
@@ -238,6 +258,15 @@ export class PlayerController {
         this.dodgeTimer = 0.28;
         this.dodgeCooldown = 1.0;
         sounds.play('jump', { volume: 0.8, rate: 1.4 });
+    }
+
+    applyKickbackAndShake(kickStrength = 3.5, shakeStrength = 0.16) {
+        // Đẩy trực tiếp tọa độ tâm ngắm trên màn hình (Cursor Kickback)
+        this.cursorKick.x += (Math.random() - 0.5) * kickStrength * 5.0;
+        this.cursorKick.y -= (Math.random() * 0.7 + 0.3) * kickStrength * 6.5; // Nảy hất nhẹ lên trên
+
+        // Rung màn hình dựa trên cỡ đạn (Screen Shake Trauma)
+        this.screenShakeTrauma = Math.min(1.0, this.screenShakeTrauma + (shakeStrength || 0.15));
     }
 
     getMovementInput() {
@@ -273,6 +302,7 @@ export class PlayerController {
 
         if (amount > 0) {
             this.health -= amount;
+            this.painTimer = 4.0;
             sounds.play('enemyHurt', { volume: 0.6, rate: 1.1 });
 
             if (hitDir) {
@@ -320,21 +350,24 @@ export class PlayerController {
     }
 
     checkHit(startPos, endPos, ray) {
-        const playerBox = new THREE.Box3(
-            new THREE.Vector3(this.position.x - this.radius, this.position.y, this.position.z - this.radius),
-            new THREE.Vector3(this.position.x + this.radius, this.position.y + this.height, this.position.z + this.radius)
-        );
+        _tempBoxMin.set(this.position.x - this.radius, this.position.y, this.position.z - this.radius);
+        _tempBoxMax.set(this.position.x + this.radius, this.position.y + this.height, this.position.z + this.radius);
+        _tempPlayerBox.min.copy(_tempBoxMin);
+        _tempPlayerBox.max.copy(_tempBoxMax);
 
-        const hitPoint = new THREE.Vector3();
-        const hit = ray.intersectBox(playerBox, hitPoint);
-        if (hit && startPos.distanceTo(hitPoint) <= startPos.distanceTo(endPos)) {
-            return { hit: true, point: hitPoint };
+        const hit = ray.intersectBox(_tempPlayerBox, _tempPlayerHitPoint);
+        if (hit && startPos.distanceTo(_tempPlayerHitPoint) <= startPos.distanceTo(endPos)) {
+            return { hit: true, point: _tempPlayerHitPoint.clone() };
         }
         return { hit: false };
     }
 
     update(delta, arena, enemies = []) {
+        this.enemiesRef = enemies;
         this.invulnerability = Math.max(0, this.invulnerability - delta);
+        if (this.painTimer > 0) {
+            this.painTimer = Math.max(0, this.painTimer - delta);
+        }
         if (this.mixer) {
             this.mixer.update(delta);
         }
@@ -372,6 +405,9 @@ export class PlayerController {
         let currentSpeed = this.speed;
         if (this.isADS) {
             currentSpeed *= 0.65;
+        }
+        if (this.weapons?.isUsingMedkit) {
+            currentSpeed *= 0.55; // Vừa sơ cứu vừa di chuyển cẩn thận
         }
 
         const moveDir = this.getMovementInput();
@@ -430,6 +466,12 @@ export class PlayerController {
             this.velocity.y = 0;
             this.isGrounded = true;
         }
+
+        // Giảm dần độ giật con trỏ (Cursor Kickback Decay)
+        this.cursorKick.lerp(new THREE.Vector2(0, 0), 1 - Math.exp(-22 * delta));
+
+        // Giảm dần chấn thương rung màn hình (Screen Shake Trauma Decay)
+        this.screenShakeTrauma = Math.max(0, this.screenShakeTrauma - delta * 2.2);
 
         this.updateCamera(delta);
         this.updateAim(enemies);
@@ -511,15 +553,31 @@ export class PlayerController {
                 muzzlePos.copy(this.position).add(new THREE.Vector3(0, 1.2, 0));
             }
 
-            this.weapons.shoot(muzzlePos, this.aimPoint, this.isADS, true);
+            this.weapons.shoot(muzzlePos, this.aimPoint, this.isADS, true, 1.0, this);
         }
     }
 
     updateCamera(delta) {
-        // Follow X/Z only so jumping cannot bob or rotate the fixed camera.
+        // Tâm điểm máy ảnh: Dịch nhẹ về phía chuột khi ADS (giữ chuột phải)
         const target = new THREE.Vector3(this.position.x, 0.7, this.position.z);
-        this.cameraFocus.lerp(target, 1 - Math.exp(-10 * Math.max(0, delta)));
+        if (this.isADS) {
+            const aimVec = new THREE.Vector3().subVectors(this.aimPoint, this.position);
+            aimVec.y = 0;
+            aimVec.clampLength(0, 4.2);
+            target.addScaledVector(aimVec, 0.35); // Dịch nhẹ 35% về phía con trỏ chuột
+        }
+
+        this.cameraFocus.lerp(target, 1 - Math.exp(-12 * Math.max(0, delta)));
         this.camera.position.copy(this.cameraFocus).add(this.cameraOffset);
+
+        // Hiệu ứng rung màn hình chấn thương (Screen Shake Trauma)
+        const shake = this.screenShakeTrauma * this.screenShakeTrauma * 0.48;
+        if (shake > 0.0005) {
+            const t = performance.now() * 0.045;
+            this.camera.position.x += Math.sin(t) * shake;
+            this.camera.position.z += Math.cos(t * 1.3) * shake;
+        }
+
         this.camera.lookAt(this.cameraFocus);
         this.camera.updateMatrixWorld(true);
     }

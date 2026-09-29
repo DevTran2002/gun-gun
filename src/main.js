@@ -1,16 +1,16 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../libs/loaders/GLTFLoader.js';
-import { sounds } from './audio.js';
-import { ParticleSystem } from './particles.js';
-import { Arena } from './arena.js';
-import { WeaponSystem } from './weapons.js';
-import { PlayerController } from './player.js';
-import { WaveManager, Zombie } from './enemies.js';
-import { PickupManager } from './pickups.js';
-import { UIManager } from './ui.js';
-import { NetworkRoom, makeRemotePlayer } from './network.js';
-import { normalizeCharacter } from './characters.js';
-import { RoomLobby } from './lobby.js';
+import { sounds } from './audio.js?v=4';
+import { ParticleSystem } from './particles.js?v=4';
+import { Arena } from './arena.js?v=4';
+import { WeaponSystem } from './weapons.js?v=4';
+import { PlayerController } from './player.js?v=4';
+import { WaveManager, Zombie } from './enemies.js?v=4';
+import { PickupManager } from './pickups.js?v=4';
+import { UIManager } from './ui.js?v=4';
+import { NetworkRoom, makeRemotePlayer } from './network.js?v=4';
+import { normalizeCharacter } from './characters.js?v=4';
+import { RoomLobby } from './lobby.js?v=4';
 
 class CyberArenaGame {
     constructor() {
@@ -274,9 +274,9 @@ class CyberArenaGame {
         }, 1200);
     }
 
-    onHitEnemy(damage, isCrit, hitPoint) {
+    onHitEnemy(damage, isCrit, hitPoint, hitResult = null) {
         this.ui.triggerHitmarker(isCrit);
-        this.ui.showDamageNumber(damage, isCrit, hitPoint, this.camera);
+        this.ui.showDamageNumber(damage, isCrit, hitPoint, this.camera, hitResult);
     }
 
     onEnemyKilled(enemy) {
@@ -618,7 +618,7 @@ class CyberArenaGame {
             // Update Weapons & Projectiles
             if (!this.network.active || this.network.host) {
                 this.weapons.update(delta, this.arena, this.waveManager.enemies, this.coopPlayers,
-                    (dmg, crit, pt) => this.onHitEnemy(dmg, crit, pt));
+                    (dmg, crit, pt, hitResult) => this.onHitEnemy(dmg, crit, pt, hitResult));
                 for (const remote of this.remotePlayers.values()) {
                     this.network.processCommands(remote);
                     remote.weapons.update(delta, this.arena, this.waveManager.enemies, this.coopPlayers);

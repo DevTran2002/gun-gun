@@ -1,5 +1,12 @@
 import * as THREE from 'three';
 
+const _tempArenaBox = new THREE.Box3();
+const _tempArenaMin = new THREE.Vector3();
+const _tempArenaMax = new THREE.Vector3();
+const _tempLosDir = new THREE.Vector3();
+const _tempLosRay = new THREE.Ray();
+const _tempLosHit = new THREE.Vector3();
+
 export class Arena {
     constructor(scene, gltfLoader) {
         this.scene = scene;
@@ -400,13 +407,13 @@ export class Arena {
     }
 
     checkCollision(pos, radius = 0.5) {
-        const playerBox = new THREE.Box3(
-            new THREE.Vector3(pos.x - radius, 0.1, pos.z - radius),
-            new THREE.Vector3(pos.x + radius, 2.0, pos.z + radius)
-        );
+        _tempArenaMin.set(pos.x - radius, 0.1, pos.z - radius);
+        _tempArenaMax.set(pos.x + radius, 2.0, pos.z + radius);
+        _tempArenaBox.min.copy(_tempArenaMin);
+        _tempArenaBox.max.copy(_tempArenaMax);
 
         for (const col of this.colliders) {
-            if (col.intersectsBox(playerBox)) {
+            if (col.intersectsBox(_tempArenaBox)) {
                 return true;
             }
         }
@@ -414,13 +421,13 @@ export class Arena {
     }
 
     hasLineOfSight(fromPos, toPos) {
-        const dir = new THREE.Vector3().subVectors(toPos, fromPos);
-        const dist = dir.length();
-        dir.normalize();
+        _tempLosDir.subVectors(toPos, fromPos);
+        const dist = _tempLosDir.length();
+        if (dist > 0.0001) _tempLosDir.multiplyScalar(1 / dist);
 
-        const ray = new THREE.Ray(fromPos, dir);
+        _tempLosRay.set(fromPos, _tempLosDir);
         for (const col of this.colliders) {
-            const hit = ray.intersectBox(col, new THREE.Vector3());
+            const hit = _tempLosRay.intersectBox(col, _tempLosHit);
             if (hit && fromPos.distanceTo(hit) < dist - 0.2) {
                 return false;
             }

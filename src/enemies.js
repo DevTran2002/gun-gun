@@ -5,6 +5,22 @@ import { HealthBar3D } from './healthbar.js';
 
 const ZOMBIE_RADII = { walker: 0.6, sprinter: 0.55, tank: 0.9, boss: 1.3, giant: 1.65, spitter: 0.7 };
 
+const _upAxis = new THREE.Vector3(0, 1, 0);
+const _tempCenter = new THREE.Vector3();
+const _tempSphere = new THREE.Sphere();
+const _tempHitPoint = new THREE.Vector3();
+const _tempToPlayer = new THREE.Vector3();
+const _tempSpitOrigin = new THREE.Vector3();
+const _tempPlayerTarget = new THREE.Vector3();
+const _tempSeparation = new THREE.Vector3();
+const _tempDiff = new THREE.Vector3();
+const _tempMoveVel = new THREE.Vector3();
+const _tempDesiredDir = new THREE.Vector3();
+const _tempNextPos = new THREE.Vector3();
+const _tempLeftDir = new THREE.Vector3();
+const _tempRightDir = new THREE.Vector3();
+const _tempCheckPos = new THREE.Vector3();
+
 export class Zombie {
     constructor(scene, type, position, gltfModels, particles, phaseNum = 1, weapons = null) {
         this.scene = scene;
@@ -23,6 +39,8 @@ export class Zombie {
 
         if (type === 'giant') {
             this.baseHealth = 460;
+            this.baseArmor = 220;
+            this.armorClass = 3; // Giáp nặng cấp 3
             this.speed = 2.8 * speedMult;
             this.scale = 3.8;
             this.damage = Math.round(35 * dmgMult);
@@ -31,6 +49,8 @@ export class Zombie {
             this.scoreValue = 350 * phaseNum;
         } else if (type === 'spitter') {
             this.baseHealth = 100;
+            this.baseArmor = 20;
+            this.armorClass = 1; // Giáp nhẹ cấp 1
             this.speed = 3.9 * speedMult;
             this.scale = 1.85;
             this.damage = Math.round(18 * dmgMult);
@@ -39,6 +59,8 @@ export class Zombie {
             this.scoreValue = 160 * phaseNum;
         } else if (type === 'boss') {
             this.baseHealth = 700;
+            this.baseArmor = 380;
+            this.armorClass = 4; // Giáp siêu cấp 4
             this.speed = 4.2 * speedMult;
             this.scale = 2.4;
             this.damage = Math.round(28 * dmgMult);
@@ -47,6 +69,8 @@ export class Zombie {
             this.scoreValue = 600 * phaseNum;
         } else if (type === 'tank') {
             this.baseHealth = 220;
+            this.baseArmor = 130;
+            this.armorClass = 2; // Giáp kim loại cấp 2
             this.speed = 3.6 * speedMult;
             this.scale = 2.1;
             this.damage = Math.round(22 * dmgMult);
@@ -55,6 +79,8 @@ export class Zombie {
             this.scoreValue = 180 * phaseNum;
         } else if (type === 'sprinter') {
             this.baseHealth = 55;
+            this.baseArmor = 0;
+            this.armorClass = 0; // Không có giáp
             this.speed = 9.0 * speedMult;
             this.scale = 1.6;
             this.damage = Math.round(14 * dmgMult);
@@ -63,6 +89,8 @@ export class Zombie {
             this.scoreValue = 120 * phaseNum;
         } else { // 'walker'
             this.baseHealth = 85;
+            this.baseArmor = 0;
+            this.armorClass = 0; // Không có giáp
             this.speed = 4.8 * speedMult;
             this.scale = 1.65;
             this.damage = Math.round(16 * dmgMult);
@@ -73,6 +101,8 @@ export class Zombie {
 
         this.maxHealth = Math.round(this.baseHealth * phaseMult);
         this.health = this.maxHealth;
+        this.maxArmor = Math.round(this.baseArmor * phaseMult);
+        this.armor = this.maxArmor;
 
         this.attackTimer = 0.4 + Math.random() * 0.5;
         this.isAttacking = false;
@@ -209,26 +239,58 @@ export class Zombie {
         this.currentAction = newAction;
     }
 
-    takeDamage(amount, isCrit, hitDir) {
-        if (this.isDead) return;
+    takeDamage(amount, penPower = 1, isCrit = false, hitDir = null) {
+        if (this.isDead) return { isPenetrated: false, isBlunt: false, healthDamage: 0, armorDamage: 0 };
 
-        this.health -= amount;
-        this.flashTimer = 0.1;
+        const ac = this.armorClass || 0;
+        const isPenetrated = (penPower >= ac) || (this.armor <= 0);
+        let healthDmg = 0;
+        let armorDmg = 0;
+        let isBlunt = false;
 
-        sounds.play('enemyHurt', { volume: 0.5, pitchVariation: 0.2 });
+        if (isPenetrated) {
+            // Đạn xuyên giáp (Pen Power >= AC): Sát thương trừ thẳng vào Máu (Health), giảm nhẹ Giáp
+            healthDmg = Math.round(amount * 0.88);
+            armorDmg = Math.round(amount * 0.32);
+            this.health -= healthDmg;
+            this.armor = Math.max(0, this.armor - armorDmg);
+            this.flashTimer = 0.12;
 
-        // Red flash highlight
-        if (this.mesh) {
-            this.mesh.traverse(c => {
-                if (c.isMesh && c.material && c.material.emissive) {
-                    c.material.emissive.setHex(isCrit ? 0xff0022 : 0xcc3300);
-                }
-            });
+            sounds.play('enemyHurt', { volume: 0.5, pitchVariation: 0.2 });
+
+            // Nháy đỏ / cam (Damage Flash Shader/Material)
+            if (this.mesh) {
+                this.mesh.traverse(c => {
+                    if (c.isMesh && c.material && c.material.emissive) {
+                        c.material.emissive.setHex(isCrit ? 0xff0022 : 0xcc3300);
+                    }
+                });
+            }
+        } else {
+            // Bị giáp cản (Pen Power < AC): Đạn trừ vào Giáp, chỉ gây sát thương cùn (Blunt: 1-2 HP) vào Máu
+            armorDmg = Math.min(this.armor, Math.round(amount));
+            this.armor = Math.max(0, this.armor - armorDmg);
+            healthDmg = Math.min(2, Math.max(1, Math.round(amount * 0.08))); // 1-2 HP sát thương cùn
+            this.health -= healthDmg;
+            isBlunt = true;
+            this.flashTimer = 0.08;
+
+            // Âm thanh kim loại va đập cản giáp
+            sounds.playArmorDeflect();
+
+            // Nháy trắng sáng kim loại (Damage Flash kim loại)
+            if (this.mesh) {
+                this.mesh.traverse(c => {
+                    if (c.isMesh && c.material && c.material.emissive) {
+                        c.material.emissive.setHex(0xffffff);
+                    }
+                });
+            }
         }
 
         // Knockback (tanks and bosses have heavy resistance)
         if (hitDir && this.type !== 'boss') {
-            const kb = this.type === 'giant' ? 0.1 : this.type === 'tank' ? 0.2 : 0.6;
+            const kb = this.type === 'giant' ? 0.08 : this.type === 'tank' ? 0.15 : 0.55;
             const displaced = this.position.clone().addScaledVector(new THREE.Vector3(hitDir.x, 0, hitDir.z), kb);
             if (!this.arena || !this.arena.checkCollision(displaced, this.radius)) this.position.copy(displaced);
         }
@@ -236,6 +298,14 @@ export class Zombie {
         if (this.health <= 0) {
             this.die();
         }
+
+        return {
+            isPenetrated,
+            isBlunt,
+            healthDamage: healthDmg,
+            armorDamage: armorDmg,
+            isCrit
+        };
     }
 
     die() {
@@ -266,17 +336,18 @@ export class Zombie {
     checkHit(startPos, endPos, ray) {
         if (!this.mesh || this.isDead) return { hit: false };
 
-        const center = this.position.clone();
-        center.y = this.position.y + (this.scale * 0.45);
+        _tempCenter.copy(this.position);
+        _tempCenter.y += (this.scale * 0.45);
 
-        const sphere = new THREE.Sphere(center, this.radius);
-        const hitPoint = new THREE.Vector3();
-        const hit = ray.intersectSphere(sphere, hitPoint);
+        _tempSphere.center.copy(_tempCenter);
+        _tempSphere.radius = this.radius;
 
-        if (hit && startPos.distanceTo(hitPoint) <= startPos.distanceTo(endPos)) {
+        const hit = ray.intersectSphere(_tempSphere, _tempHitPoint);
+
+        if (hit && startPos.distanceTo(_tempHitPoint) <= startPos.distanceTo(endPos)) {
             // Headshot is top 30% of zombie height
-            const isCrit = (hitPoint.y > center.y + this.radius * 0.32);
-            return { hit: true, point: hitPoint, isCrit: isCrit };
+            const isCrit = (_tempHitPoint.y > _tempCenter.y + this.radius * 0.32);
+            return { hit: true, point: _tempHitPoint.clone(), isCrit: isCrit };
         }
 
         return { hit: false };
@@ -307,87 +378,95 @@ export class Zombie {
             return;
         }
 
-        // Distance and direction to player
-        const toPlayer = new THREE.Vector3().subVectors(player.position, this.position);
-        toPlayer.y = 0;
-        const dist = toPlayer.length();
-        toPlayer.normalize();
-        const spitOrigin = this.position.clone().add(new THREE.Vector3(0, this.scale * 0.61, 0));
+        // Distance and direction to player (tái sử dụng vector module)
+        _tempToPlayer.subVectors(player.position, this.position);
+        _tempToPlayer.y = 0;
+        const dist = _tempToPlayer.length();
+        if (dist > 0.001) _tempToPlayer.multiplyScalar(1 / dist);
+
+        _tempSpitOrigin.copy(this.position);
+        _tempSpitOrigin.y += this.scale * 0.61;
         if (this.spitMouth && this.mesh.getObjectByName('head')) {
             this.mesh.updateMatrixWorld(true);
-            this.spitMouth.getWorldPosition(spitOrigin);
+            this.spitMouth.getWorldPosition(_tempSpitOrigin);
         }
-        const playerTarget = player.position.clone().add(new THREE.Vector3(0, 0.9, 0));
-        const canSpit = this.type === 'spitter' && dist <= 24 && arena.hasLineOfSight(spitOrigin, playerTarget);
+        _tempPlayerTarget.copy(player.position);
+        _tempPlayerTarget.y += 0.9;
+        const canSpit = this.type === 'spitter' && dist <= 24 && arena.hasLineOfSight(_tempSpitOrigin, _tempPlayerTarget);
 
-        // 1. Swarm separation: gently push away from nearby zombies to avoid overlapping
-        const separation = new THREE.Vector3();
+        // 1. Swarm separation: giải thuật đẩy quái không sinh rác GC
+        _tempSeparation.set(0, 0, 0);
         let neighborCount = 0;
         for (const other of allZombies) {
             if (other === this || other.isDead) continue;
-            const diff = new THREE.Vector3().subVectors(this.position, other.position);
-            diff.y = 0;
-            const d = diff.length();
+            _tempDiff.subVectors(this.position, other.position);
+            _tempDiff.y = 0;
+            const d = _tempDiff.length();
             const minSpace = this.radius + other.radius;
             if (d > 0.01 && d < minSpace) {
-                diff.normalize().multiplyScalar((minSpace - d) / minSpace);
-                separation.add(diff);
+                _tempDiff.multiplyScalar((minSpace - d) / (minSpace * d));
+                _tempSeparation.add(_tempDiff);
                 neighborCount++;
             }
         }
         if (neighborCount > 0) {
-            separation.multiplyScalar(4.0);
+            _tempSeparation.multiplyScalar(4.0);
         }
 
         // 2. Chasing movement & AI Obstacle Avoidance
-        const moveVel = new THREE.Vector3();
+        _tempMoveVel.set(0, 0, 0);
         const holdingRange = canSpit && dist >= 9 && dist <= 17;
         const windingUp = this.spitCharge > 0 || (this.type === 'giant' && this.isAttacking);
         if (!windingUp && !holdingRange && dist > this.attackRange * 0.8) {
-            let desiredDir = toPlayer.clone();
-            if (canSpit && dist < 9) desiredDir.negate();
+            _tempDesiredDir.copy(_tempToPlayer);
+            if (canSpit && dist < 9) _tempDesiredDir.negate();
             
             // AI: Obstacle avoidance check
             const feelerDist = this.radius * 2.5;
-            const nextPos = this.position.clone().addScaledVector(desiredDir, feelerDist);
-            if (arena.checkCollision(nextPos, this.radius)) {
+            _tempNextPos.copy(this.position).addScaledVector(_tempDesiredDir, feelerDist);
+            if (arena.checkCollision(_tempNextPos, this.radius)) {
                 // Try left and right feelers to slide around obstacle
-                const leftDir = desiredDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 3);
-                const rightDir = desiredDir.clone().applyAxisAngle(new THREE.Vector3(0, 1, 0), -Math.PI / 3);
+                _tempLeftDir.copy(_tempDesiredDir).applyAxisAngle(_upAxis, Math.PI / 3);
+                _tempRightDir.copy(_tempDesiredDir).applyAxisAngle(_upAxis, -Math.PI / 3);
                 
-                const canGoLeft = !arena.checkCollision(this.position.clone().addScaledVector(leftDir, feelerDist), this.radius);
-                const canGoRight = !arena.checkCollision(this.position.clone().addScaledVector(rightDir, feelerDist), this.radius);
+                _tempNextPos.copy(this.position).addScaledVector(_tempLeftDir, feelerDist);
+                const canGoLeft = !arena.checkCollision(_tempNextPos, this.radius);
+                _tempNextPos.copy(this.position).addScaledVector(_tempRightDir, feelerDist);
+                const canGoRight = !arena.checkCollision(_tempNextPos, this.radius);
                 
                 if (canGoLeft && !canGoRight) {
-                    desiredDir.copy(leftDir);
+                    _tempDesiredDir.copy(_tempLeftDir);
                 } else if (canGoRight && !canGoLeft) {
-                    desiredDir.copy(rightDir);
+                    _tempDesiredDir.copy(_tempRightDir);
                 } else if (canGoLeft && canGoRight) {
                     // Pick one randomly if both are open but forward is blocked
-                    desiredDir.copy(Math.random() > 0.5 ? leftDir : rightDir);
+                    _tempDesiredDir.copy(Math.random() > 0.5 ? _tempLeftDir : _tempRightDir);
                 } else {
                     // Heavily blocked, try sharper turn to get unstuck
-                    desiredDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI / 1.5);
+                    _tempDesiredDir.applyAxisAngle(_upAxis, Math.PI / 1.5);
                 }
             }
 
-            // Flanking behavior for sprinters to make them more erratic and harder to hit
+            // Flanking behavior for sprinters
             if (this.type === 'sprinter' && dist > 5) {
-                 desiredDir.applyAxisAngle(new THREE.Vector3(0, 1, 0), Math.sin(performance.now() * 0.002 + this.position.x) * 0.6);
+                _tempDesiredDir.applyAxisAngle(_upAxis, Math.sin(performance.now() * 0.002 + this.position.x) * 0.6);
             }
 
-            moveVel.addScaledVector(desiredDir.normalize(), this.speed);
+            _tempDesiredDir.normalize();
+            _tempMoveVel.addScaledVector(_tempDesiredDir, this.speed);
         }
-        moveVel.add(separation);
+        _tempMoveVel.add(_tempSeparation);
 
         // Apply movement with arena collision
-        const nextX = this.position.x + moveVel.x * delta;
-        const nextZ = this.position.z + moveVel.z * delta;
+        const nextX = this.position.x + _tempMoveVel.x * delta;
+        const nextZ = this.position.z + _tempMoveVel.z * delta;
 
-        if (!arena.checkCollision(new THREE.Vector3(nextX, this.position.y, this.position.z), this.radius)) {
+        _tempCheckPos.set(nextX, this.position.y, this.position.z);
+        if (!arena.checkCollision(_tempCheckPos, this.radius)) {
             this.position.x = nextX;
         }
-        if (!arena.checkCollision(new THREE.Vector3(this.position.x, this.position.y, nextZ), this.radius)) {
+        _tempCheckPos.set(this.position.x, this.position.y, nextZ);
+        if (!arena.checkCollision(_tempCheckPos, this.radius)) {
             this.position.z = nextZ;
         }
 
@@ -395,9 +474,9 @@ export class Zombie {
         this.healthBar?.update(this.position, this.health, this.maxHealth, true);
 
         // Zombie faces direction of motion / player
-        let targetYaw = Math.atan2(toPlayer.x, toPlayer.z);
-        if (moveVel.lengthSq() > 0.5) {
-            targetYaw = Math.atan2(moveVel.x, moveVel.z);
+        let targetYaw = Math.atan2(_tempToPlayer.x, _tempToPlayer.z);
+        if (_tempMoveVel.lengthSq() > 0.5) {
+            targetYaw = Math.atan2(_tempMoveVel.x, _tempMoveVel.z);
         }
         // Removed the + Math.PI offset because Kenney models face +Z natively
 
@@ -414,16 +493,16 @@ export class Zombie {
                 this.spitCharge -= delta;
                 for (const part of this.mutationParts) part.scale.setScalar(1 + Math.sin(this.spitCharge * 25) * 0.2);
                 if (this.spitCharge <= 0) {
-                    if (arena.hasLineOfSight(spitOrigin, this.acidTarget)) {
-                        this.weapons?.shootEnemyBolt(spitOrigin, this.acidTarget, this.damage, 18, true);
+                    if (this.acidTarget && arena.hasLineOfSight(_tempSpitOrigin, this.acidTarget)) {
+                        this.weapons?.shootEnemyBolt(_tempSpitOrigin, this.acidTarget, this.damage, 18, true);
                     }
                     for (const part of this.mutationParts) part.scale.setScalar(1);
                 }
             } else if (canSpit && dist > 4 && this.attackTimer <= 0 && this.weapons) {
                 this.spitCharge = 0.7;
-                this.acidTarget = playerTarget;
+                this.acidTarget = _tempPlayerTarget.clone();
                 this.attackTimer = this.attackCooldown;
-                this.particles.createImpactSparks(spitOrigin, new THREE.Vector3(0, 1, 0), 0x99ff22, 6);
+                this.particles.createImpactSparks(_tempSpitOrigin, _upAxis, 0x99ff22, 6);
             }
         }
 
@@ -439,15 +518,17 @@ export class Zombie {
             if (this.currentAttackTimer <= 0) {
                 this.isAttacking = false;
                 if (this.type === 'giant') {
-                    this.particles.createImpactSparks(this.position.clone().add(new THREE.Vector3(0, 0.15, 0)), new THREE.Vector3(0, 1, 0), 0xff6622, 24);
-                    if (dist <= this.attackRange && arena.hasLineOfSight(spitOrigin, playerTarget)) this.applyMeleeDamage(player);
+                    _tempHitPoint.copy(this.position);
+                    _tempHitPoint.y += 0.15;
+                    this.particles.createImpactSparks(_tempHitPoint, _upAxis, 0xff6622, 24);
+                    if (dist <= this.attackRange && arena.hasLineOfSight(_tempSpitOrigin, _tempPlayerTarget)) this.applyMeleeDamage(player);
                 }
                 const runAnim = (this.type === 'sprinter') ? 'sprint' : 'walk';
                 this.playAnimation(this.animations[runAnim] ? runAnim : 'walk');
             }
         }
 
-        if (dist <= this.attackRange && this.attackTimer <= 0 && !this.isAttacking && this.spitCharge <= 0 && arena.hasLineOfSight(spitOrigin, playerTarget)) {
+        if (dist <= this.attackRange && this.attackTimer <= 0 && !this.isAttacking && this.spitCharge <= 0 && arena.hasLineOfSight(_tempSpitOrigin, _tempPlayerTarget)) {
             this.performMeleeAttack(player);
         }
     }

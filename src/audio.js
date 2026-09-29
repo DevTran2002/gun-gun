@@ -152,6 +152,113 @@ class SoundManager {
         osc.stop(this.ctx.currentTime + 0.15);
     }
 
+    // Tiếng cạch kim loại giòn rụm khi súng kẹt đạn (Jam Click)
+    playJamClick() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(320, t);
+        osc.frequency.exponentialRampToValueAtTime(80, t + 0.04);
+
+        gain.gain.setValueAtTime(0.4, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.04);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.04);
+    }
+
+    // Tiếng kéo khóa nòng cơ khí kép clack-clack khi thông nòng thành công (Clear Jam)
+    playClearJam() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        [0, 0.12].forEach((offset, idx) => {
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(idx === 0 ? 440 : 660, t + offset);
+            osc.frequency.exponentialRampToValueAtTime(idx === 0 ? 220 : 330, t + offset + 0.07);
+
+            gain.gain.setValueAtTime(0.45, t + offset);
+            gain.gain.exponentialRampToValueAtTime(0.001, t + offset + 0.07);
+
+            osc.connect(gain);
+            gain.connect(this.masterGain);
+            osc.start(t + offset);
+            osc.stop(t + offset + 0.07);
+        });
+    }
+
+    // Tiếng đạn va đập vào tấm giáp cứng (Armor Deflection / Ricochet)
+    playArmorDeflect() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(1200 + Math.random() * 300, t);
+        osc.frequency.exponentialRampToValueAtTime(300, t + 0.09);
+
+        gain.gain.setValueAtTime(0.35, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.09);
+    }
+
+    // Tiếng tiêm thuốc hồi sinh lực (Medkit)
+    playMedkit() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(350, t);
+        osc.frequency.linearRampToValueAtTime(700, t + 0.25);
+
+        gain.gain.setValueAtTime(0.35, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.35);
+    }
+
+    // Tiếng nạp pin khiên (Shield Battery)
+    playShieldBattery() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(220, t);
+        osc.frequency.exponentialRampToValueAtTime(880, t + 0.3);
+
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.32);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.32);
+    }
+
     // Procedural Cyberpunk Bass & Synth Music Track
     startMusic() {
         if (!this.musicEnabled || this.isMusicPlaying || !this.ctx) return;

@@ -27,8 +27,33 @@
 
     <!-- HUD Overlay -->
     <div id="hud" style="display: none;">
-        <!-- Top Left: Health, Shield, Stamina & Buffs (Phong cách Core Keeper / RPG - Ảnh 2) -->
-        <div class="hud-top-left-panel">
+        <!-- Atmosphere Time & Storm Counter (Góc trên bên trái như ảnh tham chiếu) -->
+        <div class="th_top_left_atmosphere">
+            <div class="th_time_badge_row">
+                <span class="th_clock_digit">10:39</span>
+                <span class="th_day_badge">Day</span>
+                <span class="th_weather_badge">Clear</span>
+            </div>
+            <div class="th_storm_row">
+                <span class="th_storm_txt">Time Until Next Storm</span>
+                <span class="th_storm_timer_capsule">
+                    <svg class="th_storm_icon" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2">
+                        <circle cx="12" cy="12" r="9"/>
+                        <polyline points="12 6 12 12 16 14"/>
+                    </svg>
+                    <span id="th-storm-clock">18:20</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Controls Instructions (Góc trên bên phải như ảnh tham chiếu) -->
+        <div class="th_controls_instruction_tag">
+            <span>Controls Instructions</span>
+            <span class="th_key_white_badge">Q</span>
+        </div>
+
+        <!-- Legacy elements kept for backward compatibility (ẩn hiển thị) -->
+        <div class="hud-top-left-panel" style="display: none;">
             <div class="rpg-bars-container">
                 <!-- Thanh Máu (Đỏ) -->
                 <div class="rpg-bar-row">
@@ -148,49 +173,119 @@
             <div id="floating-numbers" class="floating-numbers-container"></div>
         </div>
 
-        <!-- Bottom Center: Weapon Hotbar (Phong cách Core Keeper / RPG Hotbar - Ảnh 1) -->
-        <div class="hud-bottom-center">
-            <div class="hotbar-header">
-                <div class="hotbar-weapon-title">
-                    <span id="weapon-name" class="weapon-name">BLASTER-X</span>
-                    <span class="hotbar-ammo-tag">
-                        <span id="ammo-current" class="ammo-num">16</span>
-                        <span class="ammo-slash">/</span>
-                        <span id="ammo-max" class="ammo-total">16 + 32</span>
-                    </span>
+        <!-- BOTTOM HUD SYSTEM (Minimalist Survival HUD - Neo cạnh dưới màn hình) -->
+        <div id="th-bottom-hud" class="th_bottom_hud">
+            <!-- CỤM 1: CHỈ SỐ SINH TỒN & TRẠNG THÁI -->
+            <div class="th_cluster_survival">
+                <!-- Rada / La bàn cự ly ngoài cùng bên trái -->
+                <div class="th_radar_dist_box" title="Khoảng cách mục tiêu">
+                    <svg class="th_target_icon" viewBox="0 0 24 24" fill="none" stroke="#f59e0b" stroke-width="2">
+                        <circle cx="12" cy="12" r="8"/>
+                        <circle cx="12" cy="12" r="2.5" fill="#f59e0b"/>
+                        <line x1="12" y1="2" x2="12" y2="5"/>
+                        <line x1="12" y1="19" x2="12" y2="22"/>
+                        <line x1="2" y1="12" x2="5" y2="12"/>
+                        <line x1="19" y1="12" x2="22" y2="12"/>
+                    </svg>
+                    <span id="th-dist-val" class="th_dist_text">14 M</span>
                 </div>
-                <div class="reload-track">
-                    <div id="reload-progress-bar" class="reload-fill"></div>
+
+                <div class="th_survival_inner">
+                    <!-- Text trạng thái hiệu ứng bất lợi / tích cực phía trên -->
+                    <div class="th_status_tags_row">
+                        <span id="th-status-pain" class="th_status_pill">Pain 0s</span>
+                        <span id="th-status-light" class="th_status_pill th_status_light active">Light</span>
+                    </div>
+
+                    <!-- Thanh máu kèm 2 icon vòng tròn chỉ số phụ -->
+                    <div class="th_health_strip">
+                        <div class="th_health_track">
+                            <svg class="th_heart_icon" viewBox="0 0 24 24" fill="#ef4444">
+                                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                            </svg>
+                            <div class="th_health_bar_bg">
+                                <div id="th-health-fill" class="th_health_bar_fill" style="width: 100%;"></div>
+                            </div>
+                            <span id="th-health-val" class="th_health_val">100 / 100</span>
+                        </div>
+
+                        <!-- Icon tròn Trạng thái Khiên Năng Lượng (Xanh dương) -->
+                        <div id="th-circle-water" class="th_circle_badge th_circle_water" title="Năng lượng Khiên bảo hộ">
+                            <svg viewBox="0 0 24 24" fill="#38bdf8">
+                                <path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/>
+                            </svg>
+                        </div>
+
+                        <!-- Icon tròn Năng lượng / Thể lực (Cam) -->
+                        <div id="th-circle-energy" class="th_circle_badge th_circle_energy" title="Năng lượng / Thể lực">
+                            <svg viewBox="0 0 24 24" fill="#f97316">
+                                <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
+                            </svg>
+                        </div>
+                    </div>
                 </div>
-                <div id="upgrade-stats" class="upgrade-stats">DAME ×1.0 · TỐC BẮN ×1.00 · 1 TIA</div>
             </div>
 
-            <div class="hotbar-slots-row">
-                <!-- Slot 1: Súng chính -->
-                <div id="slot-1" class="hotbar-slot active" title="Súng chính [Phím 1]">
-                    <span class="hotbar-key">1</span>
-                    <div class="hotbar-icon-wrap">
-                        <img class="hotbar-img" src="assets/previews/kenney-blaster/blaster-a.png" alt="Súng">
-                    </div>
+            <!-- CỤM 2: Ô VŨ KHÍ KÍCH HOẠT (ACTIVE WEAPON SLOT [1]) -->
+            <div class="th_cluster_active_weapon">
+                <!-- Hộp đạn lớn nổi bật (Đã bỏ phím T) -->
+                <div class="th_ammo_capsule" title="Số đạn trong băng / Tổng đạn dự trữ">
+                    <span id="th-ammo-cur" class="th_ammo_cur_big">16</span>
+                    <span class="th_ammo_slash">/</span>
+                    <span id="th-ammo-reserve" class="th_ammo_res_big">96</span>
                 </div>
 
-                <!-- Slot 2: Dao cận chiến -->
-                <div id="slot-2" class="hotbar-slot" title="Dao cận chiến [Phím 2]">
-                    <span class="hotbar-key">2</span>
-                    <div class="hotbar-icon-wrap">
-                        <span class="hotbar-knife-badge">DAO</span>
+                <!-- Khung ô vũ khí kích thước lớn viền trắng sáng -->
+                <div id="th-active-slot" class="th_active_slot_box" title="Vũ khí đang kích hoạt [Phím 1]">
+                    <div id="th-active-silhouette" class="th_silhouette_box">
+                        <!-- Súng lục SVG mặc định -->
+                        <svg class="th_svg_gun" viewBox="0 0 60 40" fill="none" stroke="#e2e8f0" stroke-width="1.8">
+                            <path d="M8 12 h32 v8 h-4 v4 h-7 v12 h-9 l-3 -5 l2 -11 h-11 z" fill="rgba(255,255,255,0.18)"/>
+                            <path d="M22 24 h6 v3 h-6 z" fill="#e2e8f0"/>
+                            <line x1="8" y1="15" x2="36" y2="15"/>
+                        </svg>
                     </div>
+                    <div class="th_keybind_badge">1</div>
+                </div>
+            </div>
+
+            <!-- CỤM 3: THANH TRANG BỊ NHANH (HOTBAR 1 ĐẾN 8) -->
+            <div class="th_cluster_hotbar">
+                <!-- Ô 2: Dao cận chiến -->
+                <div id="th-slot-2" class="th_hotbar_slot" data-slot="2" title="Dao cận chiến [Phím 2]">
+                    <div class="th_slot_inner">
+                        <svg class="th_svg_bat" viewBox="0 0 44 44" fill="none">
+                            <line x1="10" y1="34" x2="14" y2="30" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>
+                            <line x1="14" y1="30" x2="34" y2="10" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+                            <circle cx="34" cy="10" r="2.5" fill="#f59e0b"/>
+                        </svg>
+                    </div>
+                    <div class="th_keybind_badge">2</div>
                 </div>
 
-                <!-- Slot 3 to 10: Ô phụ phong cách Core Keeper như Ảnh 1 -->
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">3</span></div>
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">4</span></div>
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">5</span></div>
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">6</span></div>
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">7</span></div>
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">8</span></div>
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">9</span></div>
-                <div class="hotbar-slot slot-empty"><span class="hotbar-key">0</span></div>
+                <!-- Ô 3: Túi cứu thương Medkit (mất 5s để sơ cứu) -->
+                <div id="th-slot-3" class="th_hotbar_slot" data-slot="3" title="Túi cứu thương (+50 HP / Mất 5s sơ cứu) [Phím 3]">
+                    <div class="th_slot_inner">
+                        <svg class="th_svg_item" viewBox="0 0 36 36" fill="none" stroke="#ef4444" stroke-width="1.8">
+                            <rect x="6" y="10" width="24" height="18" rx="3" fill="rgba(239,68,68,0.15)"/>
+                            <path d="M14 10 V7 a2 2 0 0 1 2 -2 h4 a2 2 0 0 1 2 2 v3"/>
+                            <path d="M18 14 v10 M13 19 h10" stroke="#ef4444" stroke-width="2.4" stroke-linecap="round"/>
+                        </svg>
+                    </div>
+                    <span id="th-qty-medkit" class="th_slot_qty">x3</span>
+                    <div class="th_keybind_badge">3</div>
+                </div>
+            </div>
+
+            <!-- Thanh tiến trình sơ cứu Medkit 5 giây -->
+            <div id="th-medkit-channel" class="th_medkit_channel" style="display: none;">
+                <div class="th_medkit_channel_label">
+                    <span class="th_medkit_label_text">ĐANG SƠ CỨU VẾT THƯƠNG...</span>
+                    <span id="th-medkit-countdown" class="th_medkit_countdown">5.0s</span>
+                </div>
+                <div class="th_medkit_channel_track">
+                    <div id="th-medkit-channel-fill" class="th_medkit_channel_fill" style="width: 0%;"></div>
+                </div>
             </div>
         </div>
 
@@ -314,6 +409,6 @@
     </div>
 
     <!-- Main Game Script -->
-    <script type="module" src="src/main.js"></script>
+    <script type="module" src="src/main.js?v=4"></script>
 </body>
 </html>

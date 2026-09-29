@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+const _tempMateWorldPos = new THREE.Vector3();
+const _tempNdc = new THREE.Vector3();
+
 // Cấu hình màu sắc đặc trưng theo từng nhân vật
 const CHARACTER_COLORS = {
     soldier: '#22e6a5',
@@ -54,8 +57,15 @@ export class UIManager {
         this.reloadBar = document.getElementById('reload-progress-bar');
         this.weaponSlots = [
             document.getElementById('slot-1'),
-            document.getElementById('slot-2')
+            document.getElementById('slot-2'),
+            document.getElementById('slot-3'),
+            document.getElementById('slot-4'),
+            document.getElementById('slot-5')
         ];
+        this.slot1Label = document.getElementById('slot-1-label');
+        this.slot3Label = document.getElementById('slot-3-label');
+        this.slotMedkitQty = document.getElementById('slot-medkit-qty');
+        this.slotShieldQty = document.getElementById('slot-shield-qty');
 
         this.crosshair = document.getElementById('crosshair');
         this.hitmarker = document.getElementById('hitmarker');
@@ -77,141 +87,438 @@ export class UIManager {
         this.teamRoster = document.getElementById('team-roster');
         this.teammateMarkers = new Map();
 
+        // Minimalist Survival Bottom HUD System Elements
+        this.thBottomHud = document.getElementById('th-bottom-hud');
+        this.thDistVal = document.getElementById('th-dist-val');
+        this.thStatusPain = document.getElementById('th-status-pain');
+        this.thStatusLight = document.getElementById('th-status-light');
+        this.thHealthFill = document.getElementById('th-health-fill');
+        this.thHealthVal = document.getElementById('th-health-val');
+        this.thCircleWater = document.getElementById('th-circle-water');
+        this.thCircleEnergy = document.getElementById('th-circle-energy');
+        this.thAmmoCur = document.getElementById('th-ammo-cur');
+        this.thAmmoReserve = document.getElementById('th-ammo-reserve');
+        this.thActiveSlot = document.getElementById('th-active-slot');
+        this.thActiveSilhouette = document.getElementById('th-active-silhouette');
+
+        this.thSlot2 = document.getElementById('th-slot-2');
+        this.thSlot3 = document.getElementById('th-slot-3');
+        this.thQtyMedkit = document.getElementById('th-qty-medkit');
+
+        // Thanh tiến trình sơ cứu Medkit 5 giây
+        this.thMedkitChannel = document.getElementById('th-medkit-channel');
+        this.thMedkitCountdown = document.getElementById('th-medkit-countdown');
+        this.thMedkitFill = document.getElementById('th-medkit-channel-fill');
+
         this.bannerTimeout = null;
         this.pickupTimeout = null;
+
+        // Cache dirty check để tối ưu 60 FPS, không gây layout reflow / GC rác
+        this._lastPosX = -9999;
+        this._lastPosY = -9999;
+        this._lastCrossDisplay = null;
+        this._lastSpreadGap = -1;
+        this._lastHpVal = -1;
+        this._lastMaxHp = -1;
+        this._lastShVal = -1;
+        this._lastMaxSh = -1;
+        this._lastStPercent = -1;
+        this._lastStText = '';
+        this._lastUpgradesKey = '';
+        this._lastVignettePulse = null;
+        this._lastScore = -1;
+        this._lastPhase = -1;
+        this._lastEnemies = -1;
+        this._lastWeaponId = '';
+        this._lastUpgradeStats = '';
+        this._lastAmmoCur = -1;
+        this._lastAmmoMaxStr = '';
+        this._lastReloadKey = '';
+        this._lastSlotKey = '';
+        this._lastBossVisible = null;
+        this._lastBossPct = -1;
+        this._lastRosterKey = '';
+
+        // Survival Bottom HUD dirty cache
+        this._lastDistVal = '';
+        this._lastPainText = '';
+        this._lastLightText = '';
+        this._lastThHpText = '';
+        this._lastThHpPct = -1;
+        this._lastAmmoCurText = '';
+        this._lastAmmoResText = '';
+        this._lastCaliberText = '';
+        this._lastActiveWeaponSilh = '';
+        this._lastSurvivalSlotKey = '';
+        this._thClicksBound = false;
     }
 
     updateStats(player, waveManager, score) {
-        for (const element of [this.crosshair, this.hitmarker]) {
-            if (!element) continue;
-            element.style.left = `${player.pointerScreen.x}px`;
-            element.style.top = `${player.pointerScreen.y}px`;
-            element.style.display = player.pointerInCanvas ? '' : 'none';
+        // Vị trí con trỏ cộng thêm Cursor Kickback (đẩy trực tiếp tọa độ tâm ngắm trên màn hình)
+        const kickX = player.cursorKick ? player.cursorKick.x : 0;
+        const kickY = player.cursorKick ? player.cursorKick.y : 0;
+        const posX = Math.round(player.pointerScreen.x + kickX);
+        const posY = Math.round(player.pointerScreen.y + kickY);
+
+        if (posX !== this._lastPosX || posY !== this._lastPosY) {
+            this._lastPosX = posX;
+            this._lastPosY = posY;
+            if (this.crosshair) {
+                this.crosshair.style.left = `${posX}px`;
+                this.crosshair.style.top = `${posY}px`;
+            }
+            if (this.hitmarker) {
+                this.hitmarker.style.left = `${posX}px`;
+                this.hitmarker.style.top = `${posY}px`;
+            }
         }
 
-        // 1. Health Bar (Đỏ)
-        const hpPercent = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
-        if (this.healthFill) this.healthFill.style.width = `${hpPercent}%`;
-        if (this.healthText) this.healthText.textContent = `${Math.ceil(player.health)} / ${player.maxHealth}`;
+        const shouldDisplay = player.pointerInCanvas ? '' : 'none';
+        if (this._lastCrossDisplay !== shouldDisplay) {
+            this._lastCrossDisplay = shouldDisplay;
+            if (this.crosshair) this.crosshair.style.display = shouldDisplay;
+            if (this.hitmarker) this.hitmarker.style.display = shouldDisplay;
+        }
 
-        // 2. Shield Bar (Xanh lam)
-        const shPercent = Math.max(0, Math.min(100, (player.shield / player.maxShield) * 100));
-        if (this.shieldFill) this.shieldFill.style.width = `${shPercent}%`;
-        if (this.shieldText) this.shieldText.textContent = `${Math.ceil(player.shield)} / ${player.maxShield}`;
+        // Cập nhật nón tản đạn mở rộng / co hẹp trực quan trên Crosshair (chỉ đổi CSS var khi giá trị pixel thay đổi)
+        if (this.crosshair) {
+            const spreadGap = Math.round(6 + (player.weapons?.currentSpreadDeg || 2) * 3.4);
+            if (spreadGap !== this._lastSpreadGap) {
+                this._lastSpreadGap = spreadGap;
+                this.crosshair.style.setProperty('--spread-gap', `${spreadGap}px`);
+            }
+        }
+
+        // 1. Health Bar (Đỏ) - Dirty check
+        const hpVal = Math.ceil(player.health);
+        if (hpVal !== this._lastHpVal || player.maxHealth !== this._lastMaxHp) {
+            this._lastHpVal = hpVal;
+            this._lastMaxHp = player.maxHealth;
+            const hpPercent = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
+            if (this.healthFill) this.healthFill.style.width = `${hpPercent}%`;
+            if (this.healthText) this.healthText.textContent = `${hpVal} / ${player.maxHealth}`;
+        }
+
+        // 2. Shield Bar (Xanh lam) - Dirty check
+        const shVal = Math.ceil(player.shield);
+        if (shVal !== this._lastShVal || player.maxShield !== this._lastMaxSh) {
+            this._lastShVal = shVal;
+            this._lastMaxSh = player.maxShield;
+            const shPercent = Math.max(0, Math.min(100, (player.shield / player.maxShield) * 100));
+            if (this.shieldFill) this.shieldFill.style.width = `${shPercent}%`;
+            if (this.shieldText) this.shieldText.textContent = `${shVal} / ${player.maxShield}`;
+        }
 
         // Weapon & Ammo info
         const ammoInfo = player.weapons.getCurrentAmmo();
         const curWeapon = player.weapons.getCurrentWeapon();
 
-        // 3. Stamina / Ammo Bar (Cam - thanh thứ 3 giống Ảnh 2)
-        if (this.staminaFill) {
-            let stPercent = 100;
-            if (!curWeapon.isKnife) {
-                if (ammoInfo.isReloading) {
-                    stPercent = Math.max(0, Math.min(100, ammoInfo.reloadProgress * 100));
-                    if (this.staminaText) this.staminaText.textContent = `NẠP ĐẠN ${Math.round(stPercent)}%`;
-                } else {
-                    stPercent = Math.max(0, Math.min(100, (ammoInfo.current / ammoInfo.max) * 100));
-                    if (this.staminaText) this.staminaText.textContent = `BĂNG ĐẠN ${ammoInfo.current}/${ammoInfo.max}`;
-                }
-            } else {
-                stPercent = 100;
-                if (this.staminaText) this.staminaText.textContent = 'CẬN CHIẾN';
-            }
-            this.staminaFill.style.width = `${stPercent}%`;
-        }
-
-        // 4. Hàng ô Buff RPG (Ảnh 2)
-        const upgrades = player.weapons.upgrades;
-        if (this.buffDamage) {
-            this.buffDamage.classList.toggle('active', upgrades.damage > 0);
-            if (this.buffDamageVal) this.buffDamageVal.textContent = `×${player.weapons.damageBoost.toFixed(1)}`;
-        }
-        if (this.buffRapid) {
-            this.buffRapid.classList.toggle('active', upgrades.rapid > 0);
-            if (this.buffRapidVal) this.buffRapidVal.textContent = `×${player.weapons.fireRateBoost.toFixed(2)}`;
-        }
-        if (this.buffMulti) {
-            this.buffMulti.classList.toggle('active', upgrades.multishot > 0);
-            if (this.buffMultiVal) this.buffMultiVal.textContent = `${player.weapons.beamCount} TIA`;
-        }
-        if (this.buffShield) {
-            const isRegening = player.shieldRegenTimer <= 0 && player.shield < player.maxShield;
-            this.buffShield.classList.toggle('active', isRegening || player.shield >= player.maxShield);
-            if (this.buffShieldVal) this.buffShieldVal.textContent = isRegening ? 'REGEN' : (player.shield >= player.maxShield ? 'FULL' : 'WAIT');
-        }
-        if (this.buffCrit) {
-            this.buffCrit.classList.toggle('active', true);
-            if (this.buffCritVal) this.buffCritVal.textContent = `×${(curWeapon.critMultiplier || 2.0).toFixed(1)}`;
-        }
-
-        // Low health vignette
-        if (this.damageVignette) {
-            if (player.health <= 30 && !player.isDead) {
-                this.damageVignette.classList.add('critical-pulsing');
-            } else {
-                this.damageVignette.classList.remove('critical-pulsing');
-            }
-        }
-
-        // Score & Phase
-        if (this.scoreVal) this.scoreVal.textContent = score.toLocaleString();
-        if (this.waveVal) this.waveVal.textContent = waveManager.currentPhase;
-        if (this.enemiesVal) this.enemiesVal.textContent = waveManager.getRemainingEnemiesCount();
-
-        // Hotbar Weapon Title & Ammo
-        if (this.weaponName) this.weaponName.textContent = curWeapon.name;
-        if (this.weaponName) this.weaponName.classList.toggle('rare', !!curWeapon.tier);
-        if (this.upgradeStats) {
-            this.upgradeStats.textContent = `DAME ×${player.weapons.damageBoost.toFixed(1)} · TỐC BẮN ×${player.weapons.fireRateBoost.toFixed(2)} · ${player.weapons.beamCount} TIA`;
-        }
-        if (this.ammoCurrent) this.ammoCurrent.textContent = ammoInfo.current;
-        if (this.ammoMax) this.ammoMax.textContent = ammoInfo.isKnife ? 'CẬN CHIẾN' : `${ammoInfo.max} + ${ammoInfo.reserve}`;
-
-        if (this.reloadBar) {
+        // 3. Stamina / Ammo Bar (Cam - thanh thứ 3) - Dirty check
+        let stPercent = 100;
+        let stText = 'CẬN CHIẾN';
+        if (!curWeapon.isKnife) {
             if (ammoInfo.isReloading) {
-                this.reloadBar.style.width = `${ammoInfo.reloadProgress * 100}%`;
-                this.reloadBar.classList.add('active');
+                stPercent = Math.max(0, Math.min(100, Math.round(ammoInfo.reloadProgress * 100)));
+                stText = `NẠP ĐẠN ${stPercent}%`;
             } else {
-                this.reloadBar.style.width = '0%';
-                this.reloadBar.classList.remove('active');
+                stPercent = Math.max(0, Math.min(100, Math.round((ammoInfo.current / ammoInfo.max) * 100)));
+                stText = `BĂNG ĐẠN ${ammoInfo.current}/${ammoInfo.max}`;
+            }
+        }
+        if (stPercent !== this._lastStPercent || stText !== this._lastStText) {
+            this._lastStPercent = stPercent;
+            this._lastStText = stText;
+            if (this.staminaFill) this.staminaFill.style.width = `${stPercent}%`;
+            if (this.staminaText) this.staminaText.textContent = stText;
+        }
+
+        // 4. Hàng ô Buff RPG - Dirty check
+        const upgrades = player.weapons.upgrades;
+        const isRegening = player.shieldRegenTimer <= 0 && player.shield < player.maxShield;
+        const upgradesKey = `${upgrades.damage}_${upgrades.rapid}_${upgrades.multishot}_${isRegening}_${player.shield >= player.maxShield}_${curWeapon.critMultiplier}_${curWeapon.id}`;
+        if (upgradesKey !== this._lastUpgradesKey) {
+            this._lastUpgradesKey = upgradesKey;
+            if (this.buffDamage) {
+                this.buffDamage.classList.toggle('active', upgrades.damage > 0);
+                if (this.buffDamageVal) this.buffDamageVal.textContent = `×${player.weapons.damageBoost.toFixed(1)}`;
+            }
+            if (this.buffRapid) {
+                this.buffRapid.classList.toggle('active', upgrades.rapid > 0);
+                if (this.buffRapidVal) this.buffRapidVal.textContent = `×${player.weapons.fireRateBoost.toFixed(2)}`;
+            }
+            if (this.buffMulti) {
+                this.buffMulti.classList.toggle('active', upgrades.multishot > 0);
+                if (this.buffMultiVal) this.buffMultiVal.textContent = `${player.weapons.beamCount} TIA`;
+            }
+            if (this.buffShield) {
+                this.buffShield.classList.toggle('active', isRegening || player.shield >= player.maxShield);
+                if (this.buffShieldVal) this.buffShieldVal.textContent = isRegening ? 'REGEN' : (player.shield >= player.maxShield ? 'FULL' : 'WAIT');
+            }
+            if (this.buffCrit) {
+                this.buffCrit.classList.toggle('active', true);
+                if (this.buffCritVal) this.buffCritVal.textContent = `×${(curWeapon.critMultiplier || 2.0).toFixed(1)}`;
             }
         }
 
-        // Hotbar Slots
-        this.weaponSlots.forEach((slot, idx) => {
-            if (slot) {
+        // Low health vignette - Dirty check
+        if (this.damageVignette) {
+            const shouldPulse = player.health <= 30 && !player.isDead;
+            if (shouldPulse !== this._lastVignettePulse) {
+                this._lastVignettePulse = shouldPulse;
+                if (shouldPulse) {
+                    this.damageVignette.classList.add('critical-pulsing');
+                } else {
+                    this.damageVignette.classList.remove('critical-pulsing');
+                }
+            }
+        }
+
+        // Score & Phase - Dirty check
+        if (score !== this._lastScore) {
+            this._lastScore = score;
+            if (this.scoreVal) this.scoreVal.textContent = score.toLocaleString();
+        }
+        if (waveManager.currentPhase !== this._lastPhase) {
+            this._lastPhase = waveManager.currentPhase;
+            if (this.waveVal) this.waveVal.textContent = waveManager.currentPhase;
+        }
+        const remEnemies = waveManager.getRemainingEnemiesCount();
+        if (remEnemies !== this._lastEnemies) {
+            this._lastEnemies = remEnemies;
+            if (this.enemiesVal) this.enemiesVal.textContent = remEnemies;
+        }
+
+        // Hotbar Weapon Title & Ammo - Dirty check
+        if (curWeapon.id !== this._lastWeaponId) {
+            this._lastWeaponId = curWeapon.id;
+            if (this.weaponName) {
+                this.weaponName.textContent = curWeapon.name;
+                this.weaponName.classList.toggle('rare', !!curWeapon.tier);
+            }
+        }
+        const upgradeStatsStr = `DAME ×${player.weapons.damageBoost.toFixed(1)} · TỐC BẮN ×${player.weapons.fireRateBoost.toFixed(2)} · ${player.weapons.beamCount} TIA`;
+        if (upgradeStatsStr !== this._lastUpgradeStats) {
+            this._lastUpgradeStats = upgradeStatsStr;
+            if (this.upgradeStats) this.upgradeStats.textContent = upgradeStatsStr;
+        }
+        if (ammoInfo.current !== this._lastAmmoCur) {
+            this._lastAmmoCur = ammoInfo.current;
+            if (this.ammoCurrent) this.ammoCurrent.textContent = ammoInfo.current;
+        }
+        const ammoMaxStr = ammoInfo.isKnife ? 'CẬN CHIẾN' : `${ammoInfo.max} + ${ammoInfo.reserve}`;
+        if (ammoMaxStr !== this._lastAmmoMaxStr) {
+            this._lastAmmoMaxStr = ammoMaxStr;
+            if (this.ammoMax) this.ammoMax.textContent = ammoMaxStr;
+        }
+
+        // Reload progress bar - Dirty check
+        const reloadKey = `${ammoInfo.isReloading}_${Math.round(ammoInfo.reloadProgress * 100)}`;
+        if (reloadKey !== this._lastReloadKey) {
+            this._lastReloadKey = reloadKey;
+            if (this.reloadBar) {
+                if (ammoInfo.isReloading) {
+                    this.reloadBar.style.width = `${Math.round(ammoInfo.reloadProgress * 100)}%`;
+                    this.reloadBar.classList.add('active');
+                } else {
+                    this.reloadBar.style.width = '0%';
+                    this.reloadBar.classList.remove('active');
+                }
+            }
+        }
+
+        // Hotbar 5 Slots Updates - Dirty check
+        const medkitQty = player.weapons.inventory?.medkits ?? 0;
+        const shieldQty = player.weapons.inventory?.shieldBatteries ?? 0;
+        const slotKey = `${player.weapons.currentSlotIndex}_${medkitQty}_${shieldQty}_${player.weapons.weaponSlots[0]?.id}_${player.weapons.weaponSlots[2]?.id}`;
+        if (slotKey !== this._lastSlotKey) {
+            this._lastSlotKey = slotKey;
+            if (this.slot1Label && player.weapons.weaponSlots[0]) {
+                this.slot1Label.textContent = player.weapons.weaponSlots[0].name;
+            }
+            if (this.slot3Label && player.weapons.weaponSlots[2]) {
+                this.slot3Label.textContent = player.weapons.weaponSlots[2].name;
+            }
+            if (this.slotMedkitQty) {
+                this.slotMedkitQty.textContent = `x${medkitQty}`;
+            }
+            if (this.slotShieldQty) {
+                this.slotShieldQty.textContent = `x${shieldQty}`;
+            }
+
+            this.weaponSlots.forEach((slot, idx) => {
+                if (!slot) return;
                 if (!slot._clickBound) {
                     slot._clickBound = true;
                     slot.addEventListener('click', () => {
-                        player.weapons?.switchWeapon(idx);
+                        player.weapons?.switchWeapon(idx, player);
                     });
                 }
-                const weapon = player.weapons.weaponSlots[idx];
-                if (!weapon) return;
-                slot.classList.toggle('rare', !!weapon.tier);
-                slot.title = weapon.name;
-                const icon = slot.querySelector('img');
-                if (icon && weapon.icon && icon.getAttribute('src') !== weapon.icon) {
-                    icon.src = weapon.icon;
-                    icon.alt = weapon.name;
-                }
-                if (idx === player.weapons.currentSlotIndex) {
-                    slot.classList.add('active');
+                const item = player.weapons.weaponSlots[idx];
+                if (!item) return;
+
+                slot.classList.toggle('rare', !!item.tier);
+                slot.title = item.name;
+
+                if (idx < 3) {
+                    if (idx === player.weapons.currentSlotIndex) {
+                        slot.classList.add('active');
+                    } else {
+                        slot.classList.remove('active');
+                    }
                 } else {
-                    slot.classList.remove('active');
+                    // Ô tiện ích 4 và 5: làm mờ nếu số lượng = 0
+                    const count = idx === 3 ? medkitQty : shieldQty;
+                    slot.style.opacity = count > 0 ? '1' : '0.45';
+                }
+            });
+        }
+
+        // Boss Health Bar - Dirty check
+        const boss = waveManager.getBoss();
+        const bossActive = !!(boss && !boss.isDead);
+        if (bossActive !== this._lastBossVisible) {
+            this._lastBossVisible = bossActive;
+            if (this.bossContainer) this.bossContainer.style.display = bossActive ? 'block' : 'none';
+        }
+        if (bossActive) {
+            const bPct = Math.round(Math.max(0, (boss.health / boss.maxHealth) * 100));
+            if (bPct !== this._lastBossPct) {
+                this._lastBossPct = bPct;
+                if (this.bossFill) this.bossFill.style.width = `${bPct}%`;
+            }
+        }
+
+        // ----------------------------------------------------
+        // MINIMALIST SURVIVAL BOTTOM HUD SYSTEM UPDATES (3 CỤM)
+        // ----------------------------------------------------
+        if (this.thBottomHud) {
+            // CỤM 1: Rada khoảng cách, trạng thái đau/nhìn & thanh máu
+            let minDist = 14;
+            const enemies = waveManager?.enemies;
+            if (enemies && enemies.length > 0) {
+                let dMin = Infinity;
+                for (let i = 0; i < enemies.length; i++) {
+                    const en = enemies[i];
+                    if (en && !en.isDead) {
+                        const d = player.position.distanceTo(en.position);
+                        if (d < dMin) dMin = d;
+                    }
+                }
+                if (dMin !== Infinity) minDist = Math.max(1, Math.round(dMin * 1.5));
+            }
+            const distStr = `${minDist} M`;
+            if (distStr !== this._lastDistVal) {
+                this._lastDistVal = distStr;
+                if (this.thDistVal) this.thDistVal.textContent = distStr;
+            }
+
+            const painSec = Math.ceil(player.painTimer || 0);
+            const painStr = `Pain ${painSec}s`;
+            if (painStr !== this._lastPainText) {
+                this._lastPainText = painStr;
+                if (this.thStatusPain) {
+                    this.thStatusPain.textContent = painStr;
+                    this.thStatusPain.style.color = painSec > 0 ? '#ef4444' : '#94a3b8';
                 }
             }
-        });
 
-        // Boss Health Bar
-        const boss = waveManager.getBoss();
-        if (boss && !boss.isDead) {
-            if (this.bossContainer) this.bossContainer.style.display = 'block';
-            const bPct = Math.max(0, (boss.health / boss.maxHealth) * 100);
-            if (this.bossFill) this.bossFill.style.width = `${bPct}%`;
-        } else {
-            if (this.bossContainer) this.bossContainer.style.display = 'none';
+            const lightStr = player.isADS ? 'ADS' : 'Light';
+            if (lightStr !== this._lastLightText) {
+                this._lastLightText = lightStr;
+                if (this.thStatusLight) this.thStatusLight.textContent = lightStr;
+            }
+
+            const hpFormatted = `${player.health.toFixed(1)} / ${player.maxHealth}`;
+            const hpThPct = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
+            if (hpFormatted !== this._lastThHpText || hpThPct !== this._lastThHpPct) {
+                this._lastThHpText = hpFormatted;
+                this._lastThHpPct = hpThPct;
+                if (this.thHealthFill) this.thHealthFill.style.width = `${hpThPct}%`;
+                if (this.thHealthVal) this.thHealthVal.textContent = hpFormatted;
+            }
+
+            if (this.thCircleWater) {
+                this.thCircleWater.style.opacity = player.shield > 0 ? '1' : '0.55';
+            }
+            if (this.thCircleEnergy) {
+                this.thCircleEnergy.style.opacity = player.isDodging ? '0.5' : '1';
+            }
+
+            // CỤM 2: Thông tin hộp đạn lớn & Silhouette súng kích hoạt
+            const curAmmoStr = curWeapon.isKnife ? '∞' : String(ammoInfo.current);
+            const resAmmoStr = curWeapon.isKnife ? '∞' : String(ammoInfo.reserve);
+            if (curAmmoStr !== this._lastAmmoCurText || resAmmoStr !== this._lastAmmoResText) {
+                this._lastAmmoCurText = curAmmoStr;
+                this._lastAmmoResText = resAmmoStr;
+                if (this.thAmmoCur) this.thAmmoCur.textContent = curAmmoStr;
+                if (this.thAmmoReserve) this.thAmmoReserve.textContent = resAmmoStr;
+            }
+
+            const silhId = curWeapon.id;
+            if (silhId !== this._lastActiveWeaponSilh) {
+                this._lastActiveWeaponSilh = silhId;
+                if (this.thActiveSilhouette) {
+                    if (curWeapon.isKnife) {
+                        this.thActiveSilhouette.innerHTML = `
+                            <svg class="th_svg_bat" viewBox="0 0 44 44" fill="none">
+                                <line x1="10" y1="34" x2="14" y2="30" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>
+                                <line x1="14" y1="30" x2="34" y2="10" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
+                                <circle cx="34" cy="10" r="2.5" fill="#f59e0b"/>
+                            </svg>`;
+                    } else if (curWeapon.id === 'scatter' || curWeapon.id === 'nova') {
+                        this.thActiveSilhouette.innerHTML = `
+                            <svg class="th_svg_gun" viewBox="0 0 60 40" fill="none" stroke="#e2e8f0" stroke-width="1.8">
+                                <path d="M4 16 h44 v6 h-12 v4 h-6 v10 h-7 l-2 -4 l1 -6 h-18 z" fill="rgba(255,255,255,0.18)"/>
+                                <rect x="20" y="24" width="4" height="10" fill="#e2e8f0"/>
+                            </svg>`;
+                    } else {
+                        this.thActiveSilhouette.innerHTML = `
+                            <svg class="th_svg_gun" viewBox="0 0 60 40" fill="none" stroke="#e2e8f0" stroke-width="1.8">
+                                <path d="M8 12 h32 v8 h-4 v4 h-7 v12 h-9 l-3 -5 l2 -11 h-11 z" fill="rgba(255,255,255,0.18)"/>
+                                <path d="M22 24 h6 v3 h-6 z" fill="#e2e8f0"/>
+                                <line x1="8" y1="15" x2="36" y2="15"/>
+                            </svg>`;
+                    }
+                }
+            }
+
+            // CỤM 3: Hotbar 3 ô [1] Súng, [2] Dao, [3] Medkit
+            const inv = player.weapons?.inventory || {};
+            const isUsingMed = !!player.weapons?.isUsingMedkit;
+            const survKey = `${player.weapons.currentSlotIndex}_${inv.medkits}_${isUsingMed}`;
+            if (survKey !== this._lastSurvivalSlotKey) {
+                this._lastSurvivalSlotKey = survKey;
+                if (this.thQtyMedkit) this.thQtyMedkit.textContent = `x${inv.medkits ?? 0}`;
+                if (this.thSlot3) {
+                    this.thSlot3.style.opacity = (inv.medkits > 0) ? '1' : '0.45';
+                    this.thSlot3.classList.toggle('active', isUsingMed);
+                }
+
+                const cSlot = player.weapons.currentSlotIndex;
+                if (this.thActiveSlot) this.thActiveSlot.classList.toggle('active', cSlot === 0);
+                if (this.thSlot2) this.thSlot2.classList.toggle('active', cSlot === 1);
+            }
+
+            // Hiển thị thanh tiến trình sơ cứu Medkit 5 giây
+            if (this.thMedkitChannel) {
+                if (player.weapons?.isUsingMedkit) {
+                    this.thMedkitChannel.style.display = 'block';
+                    const curTime = Math.max(0, player.weapons.medkitTimer);
+                    const totalTime = player.weapons.medkitTotalTime || 5.0;
+                    const pct = Math.max(0, Math.min(100, (1 - curTime / totalTime) * 100));
+                    if (this.thMedkitFill) this.thMedkitFill.style.width = `${pct}%`;
+                    if (this.thMedkitCountdown) this.thMedkitCountdown.textContent = `${curTime.toFixed(1)}s`;
+                } else {
+                    this.thMedkitChannel.style.display = 'none';
+                }
+            }
+
+            if (!this._thClicksBound) {
+                this._thClicksBound = true;
+                if (this.thActiveSlot) this.thActiveSlot.addEventListener('click', () => player.weapons?.switchWeapon(0, player));
+                if (this.thSlot2) this.thSlot2.addEventListener('click', () => player.weapons?.switchWeapon(1, player));
+                if (this.thSlot3) this.thSlot3.addEventListener('click', () => player.weapons?.startMedkitUse(player));
+            }
         }
     }
 
@@ -251,8 +558,13 @@ export class UIManager {
         }, 1600);
     }
 
-    showDamageNumber(amount, isCrit, worldPos, camera) {
+    showDamageNumber(amount, isCrit, worldPos, camera, hitResult = null) {
         if (!this.floatingContainer) return;
+
+        // Giới hạn DOM elements tối đa 20 thẻ để tối ưu hiệu năng Web không lag
+        while (this.floatingContainer.children.length >= 20) {
+            this.floatingContainer.firstElementChild?.remove();
+        }
 
         const screenPos = worldPos.clone().project(camera);
         if (screenPos.z > 1) return;
@@ -261,10 +573,20 @@ export class UIManager {
         const y = (-screenPos.y * 0.5 + 0.5) * window.innerHeight;
 
         const el = document.createElement('div');
-        el.className = isCrit ? 'damage-popup crit' : 'damage-popup';
-        el.textContent = `${Math.round(amount)}${isCrit ? ' HEADSHOT' : ''}`;
-        el.style.left = `${x + (Math.random() - 0.5) * 20}px`;
-        el.style.top = `${y + (Math.random() - 0.5) * 10}px`;
+
+        if (hitResult && hitResult.isBlunt) {
+            // Sát thương bị giáp cản: Hiện số sát thương giáp + sát thương cùn
+            el.className = 'damage-popup armor';
+            el.textContent = `GIÁP [-${hitResult.armorDamage}] (${hitResult.healthDamage} HP)`;
+        } else {
+            // Xuyên giáp hoặc trúng máu trực tiếp
+            el.className = isCrit ? 'damage-popup crit' : 'damage-popup';
+            const displayDmg = hitResult ? hitResult.healthDamage : Math.round(amount);
+            el.textContent = `${displayDmg}${isCrit ? ' HEADSHOT' : ''}`;
+        }
+
+        el.style.left = `${x + (Math.random() - 0.5) * 24}px`;
+        el.style.top = `${y + (Math.random() - 0.5) * 12}px`;
 
         this.floatingContainer.appendChild(el);
         setTimeout(() => {
@@ -616,13 +938,14 @@ export class UIManager {
             marker.el.style.setProperty('--character-color', charColor);
             marker.el.style.setProperty('--indicator-color', mate.isDowned ? '#ff1744' : charColor);
 
-            // Tọa độ thế giới của đồng đội
+            // Tọa độ thế giới của đồng đội (sử dụng vector tái sử dụng tránh GC)
             const matePos = mate.mesh ? mate.mesh.position : mate.position;
-            const worldPos = matePos.clone().add(new THREE.Vector3(0, 1.2, 0));
-            const ndc = worldPos.clone().project(camera);
+            _tempMateWorldPos.copy(matePos);
+            _tempMateWorldPos.y += 1.2;
+            _tempNdc.copy(_tempMateWorldPos).project(camera);
 
-            const screenX = (ndc.x * 0.5 + 0.5) * width;
-            const screenY = (-ndc.y * 0.5 + 0.5) * height;
+            const screenX = (_tempNdc.x * 0.5 + 0.5) * width;
+            const screenY = (-_tempNdc.y * 0.5 + 0.5) * height;
 
             // Kiểm tra xem đồng đội có đang nằm gọn trong màn hình không
             const viewMarginX = 85;
@@ -632,7 +955,7 @@ export class UIManager {
                 screenX <= width - viewMarginX &&
                 screenY >= viewMarginY &&
                 screenY <= height - viewMarginY &&
-                ndc.z >= -1 && ndc.z <= 1
+                _tempNdc.z >= -1 && _tempNdc.z <= 1
             );
 
             if (onScreen) {
@@ -786,9 +1109,16 @@ export class UIManager {
         if (!this.teamRoster) return;
         const validMates = (teammates || []).filter(mate => mate && (!mate.isDead || mate.isDowned));
         if (validMates.length === 0) {
-            this.teamRoster.style.display = 'none';
+            if (this._lastRosterKey !== 'empty') {
+                this._lastRosterKey = 'empty';
+                this.teamRoster.style.display = 'none';
+            }
             return;
         }
+
+        const rosterKey = validMates.map(m => `${m.id}_${Math.round(m.health || 0)}_${Math.round(m.shield || 0)}_${m.isDowned}_${m.characterId}`).join('|');
+        if (rosterKey === this._lastRosterKey) return;
+        this._lastRosterKey = rosterKey;
 
         this.teamRoster.style.display = 'block';
 
