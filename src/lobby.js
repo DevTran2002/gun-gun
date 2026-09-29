@@ -60,7 +60,34 @@ export class RoomLobby {
         const signature = JSON.stringify([data.code, data.host, data.you, players]);
         if (signature === this.signature) return;
         this.signature = signature;
-        this.heading.textContent = `SẢNH CHỜ · ${players.length}/4 NGƯỜI · MÃ ${data.code}`;
+        this.heading.innerHTML = '';
+        const textSpan = document.createElement('span');
+        textSpan.textContent = `SẢNH CHỜ · ${players.length}/4 NGƯỜI · MÃ ${data.code} `;
+        
+        const copyCodeBtn = document.createElement('button');
+        copyCodeBtn.className = 'btn-toggle';
+        copyCodeBtn.style.cssText = 'padding: 4px 10px; font-size: 10px; margin-left: 10px; vertical-align: middle; min-width: auto; height: auto;';
+        copyCodeBtn.textContent = 'COPY MÃ';
+        copyCodeBtn.onclick = () => {
+            navigator.clipboard.writeText(data.code).then(() => {
+                copyCodeBtn.textContent = 'ĐÃ COPY';
+                setTimeout(() => copyCodeBtn.textContent = 'COPY MÃ', 2000);
+            });
+        };
+
+        const copyLinkBtn = document.createElement('button');
+        copyLinkBtn.className = 'btn-toggle';
+        copyLinkBtn.style.cssText = 'padding: 4px 10px; font-size: 10px; margin-left: 6px; vertical-align: middle; min-width: auto; height: auto;';
+        copyLinkBtn.textContent = 'COPY LINK';
+        copyLinkBtn.onclick = () => {
+            const link = window.location.href.split('?')[0] + '?room=' + data.code;
+            navigator.clipboard.writeText(link).then(() => {
+                copyLinkBtn.textContent = 'ĐÃ COPY';
+                setTimeout(() => copyLinkBtn.textContent = 'COPY LINK', 2000);
+            });
+        };
+
+        this.heading.append(textSpan, copyCodeBtn, copyLinkBtn);
         const ids = new Set(players.map(p => p.id));
         for (const [id, member] of this.members) {
             if (!ids.has(id)) { this.remove(member); this.members.delete(id); }

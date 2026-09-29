@@ -54,6 +54,32 @@ export class ParticleSystem {
         });
     }
 
+    createKnifeSlash(position, direction, color = 0xdbe8ff) {
+        const slashGroup = new THREE.Group();
+        // Position slightly in front of the player
+        slashGroup.position.copy(position).addScaledVector(direction, 0.8);
+        
+        // Create an arc geometry for the slash
+        const geo = new THREE.PlaneGeometry(3.0, 0.6);
+        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
+        const mesh = new THREE.Mesh(geo, mat);
+        
+        // Orient the slash facing the camera (or upright)
+        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), direction);
+        mesh.rotateZ((Math.random() - 0.5) * Math.PI * 0.5); // Random slant
+
+        slashGroup.add(mesh);
+        this.scene.add(slashGroup);
+        
+        this.muzzleFlashes.push({
+            obj: slashGroup,
+            mat: mat,
+            life: 0.12,
+            maxLife: 0.12,
+            scaleSpeed: 2.5
+        });
+    }
+
     createImpactSparks(position, normal, color = 0x00f0ff, count = 10) {
         const mat = color === 0xff2255 ? this.critSparkMaterial : 
                     color === 0xffaa00 ? this.orangeSparkMaterial : this.sparkMaterial;

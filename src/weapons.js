@@ -19,8 +19,8 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 1,
         recoilPitch: 0.025,
-        scale: 0.24,
-        offset: new THREE.Vector3(-0.24, -0.05, 0.02),
+        scale: 0.38,
+        offset: new THREE.Vector3(-0.02, -0.45, 0.18),
         rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     },
     {
@@ -40,8 +40,8 @@ export const WEAPON_CONFIGS = [
         isAuto: true,
         pellets: 1,
         recoilPitch: 0.018,
-        scale: 0.24,
-        offset: new THREE.Vector3(-0.24, -0.05, 0.02),
+        scale: 0.38,
+        offset: new THREE.Vector3(-0.02, -0.45, 0.18),
         rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     },
     {
@@ -61,8 +61,8 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 6,
         recoilPitch: 0.06,
-        scale: 0.24,
-        offset: new THREE.Vector3(-0.24, -0.05, 0.02),
+        scale: 0.38,
+        offset: new THREE.Vector3(-0.02, -0.45, 0.18),
         rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     }
 ];
@@ -346,6 +346,7 @@ export class WeaponSystem {
             direction.normalize();
             this.fireCooldown = w.fireRate;
             sounds.play('enemyAttack', { volume: 0.45, rate: 1.45 });
+            this.particles.createKnifeSlash(origin, direction, w.color);
             this.projectiles.push({
                 mesh: null,
                 origin: origin.clone(),
