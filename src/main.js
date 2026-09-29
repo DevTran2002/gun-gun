@@ -96,6 +96,7 @@ class CyberArenaGame {
         this.roomName = document.getElementById('room-name');
         this.roomLobby = new RoomLobby(document.getElementById('room-lobby'), this.gltfLoader);
         this.roomCode = document.getElementById('room-code');
+        this.roomCopy = document.getElementById('room-copy');
         this.roomStatus = document.getElementById('room-status');
         this.roomStart = document.getElementById('room-start');
         this.roomCreate = document.getElementById('room-create');
@@ -105,6 +106,7 @@ class CyberArenaGame {
         this.updateCharacterSelection();
         this.roomCreate?.addEventListener('click', () => this.createRoom());
         this.roomJoin?.addEventListener('click', () => this.joinRoom());
+        this.roomCopy?.addEventListener('click', () => this.copyRoomCode());
         this.roomStart?.addEventListener('click', () => this.network.start().catch(e => this.showRoomError(e.message)));
 
         this.finalScoreEl = document.getElementById('final-score');
@@ -304,6 +306,20 @@ class CyberArenaGame {
 
     showRoomError(message) { if (this.roomStatus) this.roomStatus.textContent = message; }
 
+    copyRoomCode() {
+        if (this.roomCode && this.roomCode.value) {
+            navigator.clipboard.writeText(this.roomCode.value).then(() => {
+                if (this.roomCopy) {
+                    const oldText = this.roomCopy.textContent;
+                    this.roomCopy.textContent = 'ĐÃ COPY';
+                    setTimeout(() => { this.roomCopy.textContent = oldText; }, 2000);
+                }
+            }).catch(() => {
+                this.showRoomError('Không thể copy mã phòng.');
+            });
+        }
+    }
+
     showRoomState(data) {
         this.roomLobby?.update(data);
         this.screenMenu?.classList.add('party-menu');
@@ -311,6 +327,7 @@ class CyberArenaGame {
         const names = (data.players || []).map(player => player.name).join(', ');
         this.roomStatus.textContent = `PHÒNG ${data.code}: ${names}${data.host === data.you ? ' • Bấm BẮT ĐẦU PHÒNG' : ' • Chờ chủ phòng'}`;
         if (this.roomCode) this.roomCode.value = data.code;
+        if (this.roomCopy) this.roomCopy.style.display = 'inline-block';
         if (this.roomStart) this.roomStart.style.display = data.host === data.you ? 'inline-block' : 'none';
         if (this.roomStart) this.roomStart.disabled = (data.players || []).length < 2 || data.started;
         this.characterOptions?.forEach(option => { option.disabled = !!data.started; });
