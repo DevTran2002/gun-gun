@@ -19,9 +19,9 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 1,
         recoilPitch: 0.025,
-        scale: 0.38,
-        offset: new THREE.Vector3(-0.02, -0.45, 0.18),
-        rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
+        scale: 1.8,
+        offset: new THREE.Vector3(-0.05, -0.5, 0.2),
+        rotOffset: new THREE.Euler(Math.PI * -0.1, Math.PI * 0.35, 0)
     },
     {
         id: 'repeater',
@@ -40,9 +40,9 @@ export const WEAPON_CONFIGS = [
         isAuto: true,
         pellets: 1,
         recoilPitch: 0.018,
-        scale: 0.38,
-        offset: new THREE.Vector3(-0.02, -0.45, 0.18),
-        rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
+        scale: 1.8,
+        offset: new THREE.Vector3(-0.05, -0.5, 0.2),
+        rotOffset: new THREE.Euler(Math.PI * -0.1, Math.PI * 0.35, 0)
     },
     {
         id: 'scatter',
@@ -61,9 +61,9 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 6,
         recoilPitch: 0.06,
-        scale: 0.38,
-        offset: new THREE.Vector3(-0.02, -0.45, 0.18),
-        rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
+        scale: 1.8,
+        offset: new THREE.Vector3(-0.05, -0.5, 0.2),
+        rotOffset: new THREE.Euler(Math.PI * -0.1, Math.PI * 0.35, 0)
     }
 ];
 
@@ -270,12 +270,24 @@ export class WeaponSystem {
             const mesh = base.clone(true);
             mesh.traverse(child => {
                 if (!child.isMesh) return;
-                child.material = child.material.clone();
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(m => m.clone());
+                } else if (child.material) {
+                    child.material = child.material.clone();
+                }
+                
                 if (w.tier) {
-                    child.material.color.setHex(w.color);
-                    if (child.material.emissive) {
-                        child.material.emissive.setHex(w.color);
-                        child.material.emissiveIntensity = 0.35;
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => {
+                            m.color.setHex(w.color);
+                            if (m.emissive) { m.emissive.setHex(w.color); m.emissiveIntensity = 0.35; }
+                        });
+                    } else {
+                        child.material.color.setHex(w.color);
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(w.color);
+                            child.material.emissiveIntensity = 0.35;
+                        }
                     }
                 }
             });
