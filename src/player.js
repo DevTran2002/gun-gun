@@ -53,6 +53,7 @@ export class PlayerController {
         this.pointerScreen = new THREE.Vector2(window.innerWidth / 2, window.innerHeight * 0.325);
         this.pointerInCanvas = true;
         this.reviveRequested = false;
+        this.toggleBotRequested = false;
         this.isADS = false;
 
         // Input state
@@ -86,6 +87,7 @@ export class PlayerController {
             if (e.code === 'Digit2') this.weapons.switchWeapon(1);
             if (e.code === 'KeyQ') this.tryDodge();
             if (e.code === 'KeyE') this.reviveRequested = true;
+            if (e.code === 'KeyB') this.toggleBotRequested = true;
         });
 
         window.addEventListener('keyup', (e) => {
