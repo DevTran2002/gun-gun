@@ -87,7 +87,9 @@ export class NetworkRoom {
         if (!this.active || this.syncing) return;
         this.pollTimer -= delta;
         if (this.pollTimer > 0) return;
-        this.pollTimer = this.game.state === 'MENU' ? 0.5 : 0.05;
+        // Renderers interpolate between 10Hz samples. Polling at 20Hz made
+        // requests queue under normal latency, leaving a client frozen.
+        this.pollTimer = this.game.state === 'MENU' ? 0.5 : 0.1;
         this.syncing = true;
         this.sync().catch(error => { this.error = error.message; this.game.showRoomError(this.error); })
             .finally(() => { this.syncing = false; });
@@ -193,13 +195,18 @@ export function makeRemotePlayer(scene, loader, id, name, characterId = 'soldier
     let action = null;
     let disposed = false;
     let initialized = false;
-    const remote = { id, name, characterId: normalizeCharacter(characterId), position: new THREE.Vector3(0, 0, 8), velocity: new THREE.Vector3(), aimYaw: Math.PI,
+    const remote = { id, name, characterId: normalizeCharacter(characterId), position: new THREE.Vector3(0, 0, 8), velocity: new THREE.Vector3(), netTarget: null, netVelocity: new THREE.Vector3(), netSampleTime: 0, aimYaw: Math.PI,
         isDead: false, isDowned: false, health: 100, maxHealth: 100, shield: 100, maxShield: 100,
         radius: 0.55, height: 1.6, mesh: group, healthBar,
         updateVisual(delta = 1 / 60) {
             const blend = 1 - Math.exp(-12 * delta);
-            if (!initialized || group.position.distanceTo(this.position) > 12) { group.position.copy(this.position); initialized = true; }
-            else group.position.lerp(this.position, blend);
+            let visualTarget = this.position;
+            if (this.netTarget && this.netSampleTime) {
+                const age = Math.min(0.16, Math.max(0, (performance.now() - this.netSampleTime) / 1000));
+                visualTarget = this.netTarget.clone().addScaledVector(this.netVelocity || new THREE.Vector3(), age);
+            }
+            if (!initialized || group.position.distanceTo(visualTarget) > 12) { group.position.copy(visualTarget); initialized = true; }
+            else group.position.lerp(visualTarget, blend);
             const angle = Math.atan2(Math.sin(this.aimYaw - group.rotation.y), Math.cos(this.aimYaw - group.rotation.y));
             group.rotation.y += angle * blend;
             group.visible = !this.isDead || this.isDowned;
@@ -245,6 +252,7 @@ export function makeRemotePlayer(scene, loader, id, name, characterId = 'soldier
                 }
                 actions['holding-right']?.play();
                 const hand = characterModel.getObjectByName('arm-right');
+                remote.handNode = hand || null;
                 if (hand) remote.weapons?.attachToArm(hand);
             }, undefined, () => { if (loadingCharacter === next) loadingCharacter = null; });
         },

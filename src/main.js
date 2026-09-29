@@ -331,6 +331,10 @@ class CyberArenaGame {
         remote.weapons = new WeaponSystem(this.scene, this.gltfLoader, this.particles);
         remote.weapons.models = this.weapons.models;
         remote.weapons.resetRun();
+        // The character GLTF can finish loading before the WeaponSystem is
+        // attached to the remote object. Re-attach here so remote players do
+        // not appear empty-handed after the race.
+        if (remote.handNode) remote.weapons.attachToArm(remote.handNode);
         this.remotePlayers.set(id, remote);
         this.coopPlayers.push(remote);
         return remote;
@@ -367,6 +371,7 @@ class CyberArenaGame {
     }
 
     applyCoopSnapshot(snapshot, localId) {
+        const sampleTime = performance.now();
         const projectileIds = new Set();
         for (const state of snapshot.projectiles || []) {
             if (state.owner === localId) continue;
@@ -396,7 +401,15 @@ class CyberArenaGame {
                 continue;
             }
             const remote = this.ensureCoopPlayer(state.id, state.name, state.character);
-            remote.position.fromArray(state.position); remote.health = state.health; remote.shield = state.shield;
+            const nextPosition = new THREE.Vector3().fromArray(state.position);
+            if (remote.netTarget) {
+                const elapsed = Math.max(0.05, (sampleTime - (remote.netSampleTime || sampleTime)) / 1000);
+                remote.netVelocity.copy(nextPosition).sub(remote.netTarget).divideScalar(elapsed);
+                remote.netVelocity.y = 0;
+            }
+            remote.netTarget = nextPosition;
+            remote.netSampleTime = sampleTime;
+            remote.position.copy(nextPosition); remote.health = state.health; remote.shield = state.shield;
             remote.isDead = state.isDead; remote.isDowned = state.isDowned;
             remote.aimYaw = state.aim; remote.moving = !!state.moving;
             remote.weapons.applyNetworkState(state.weapons);
@@ -410,7 +423,16 @@ class CyberArenaGame {
                 enemy.id = state.id;
                 this.waveManager.enemies.push(enemy);
             }
-            enemy.position.fromArray(state.position); enemy.health = state.health;
+            const nextPosition = new THREE.Vector3().fromArray(state.position);
+            if (enemy.netTarget) {
+                const elapsed = Math.max(0.05, (sampleTime - (enemy.netSampleTime || sampleTime)) / 1000);
+                enemy.netVelocity = enemy.netVelocity || new THREE.Vector3();
+                enemy.netVelocity.copy(nextPosition).sub(enemy.netTarget).divideScalar(elapsed);
+                enemy.netVelocity.y = 0;
+            } else enemy.netVelocity = new THREE.Vector3();
+            enemy.netTarget = nextPosition;
+            enemy.netSampleTime = sampleTime;
+            enemy.position.copy(nextPosition); enemy.health = state.health;
         }
         for (let i = this.waveManager.enemies.length - 1; i >= 0; i--) {
             if (!snapshotEnemyIds.has(this.waveManager.enemies[i].id)) {
@@ -481,7 +503,11 @@ class CyberArenaGame {
                 this.weapons.update(delta, this.arena, [], []);
                 for (const projectile of this.remoteProjectiles.values()) projectile.mesh.position.addScaledVector(projectile.direction, projectile.speed * delta);
                 for (const enemy of this.waveManager.enemies) {
-                    enemy.mesh?.position.lerp(enemy.position, 1 - Math.exp(-12 * delta));
+                    if (enemy.netTarget && enemy.mesh) {
+                        const age = Math.min(0.16, Math.max(0, (performance.now() - enemy.netSampleTime) / 1000));
+                        const visualTarget = enemy.netTarget.clone().addScaledVector(enemy.netVelocity || new THREE.Vector3(), age);
+                        enemy.mesh.position.lerp(visualTarget, 1 - Math.exp(-18 * delta));
+                    } else enemy.mesh?.position.lerp(enemy.position, 1 - Math.exp(-18 * delta));
                     enemy.mixer?.update(delta);
                     enemy.healthBar?.update(enemy.mesh?.position || enemy.position, enemy.health, enemy.maxHealth, !enemy.isDead);
                 }
