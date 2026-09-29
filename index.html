@@ -27,29 +27,68 @@
 
     <!-- HUD Overlay -->
     <div id="hud" style="display: none;">
-        <!-- Top Left: Health, Shield & Score -->
-        <div class="hud-panel hud-top-left">
-            <div class="stat-group">
-                <div class="stat-label">
-                    <span class="label-tag">SHIELD</span>
-                    <span id="shield-text" class="stat-num">100 / 100</span>
+        <!-- Top Left: Health, Shield, Stamina & Buffs (Phong cách Core Keeper / RPG - Ảnh 2) -->
+        <div class="hud-top-left-panel">
+            <div class="rpg-bars-container">
+                <!-- Thanh Máu (Đỏ) -->
+                <div class="rpg-bar-row">
+                    <div class="rpg-bar-track health">
+                        <div id="health-fill" class="rpg-bar-fill health" style="width: 100%;"></div>
+                        <div class="rpg-bar-segments">
+                            <span></span><span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div id="health-text" class="rpg-bar-value">100 / 100</div>
                 </div>
-                <div class="stat-bar-track">
-                    <div id="shield-fill" class="stat-bar-fill shield"></div>
+
+                <!-- Thanh Khiên (Xanh lam) -->
+                <div class="rpg-bar-row">
+                    <div class="rpg-bar-track shield">
+                        <div id="shield-fill" class="rpg-bar-fill shield" style="width: 100%;"></div>
+                        <div class="rpg-bar-segments">
+                            <span></span><span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div id="shield-text" class="rpg-bar-value">100 / 100</div>
+                </div>
+
+                <!-- Thanh Đạn / Thể lực (Cam) -->
+                <div class="rpg-bar-row">
+                    <div class="rpg-bar-track stamina">
+                        <div id="stamina-fill" class="rpg-bar-fill stamina" style="width: 100%;"></div>
+                        <div class="rpg-bar-segments">
+                            <span></span><span></span><span></span><span></span><span></span><span></span>
+                        </div>
+                    </div>
+                    <div id="stamina-text" class="rpg-bar-value">BĂNG ĐẠN</div>
                 </div>
             </div>
 
-            <div class="stat-group">
-                <div class="stat-label">
-                    <span class="label-tag">HEALTH</span>
-                    <span id="health-text" class="stat-num">100 / 100</span>
+            <!-- Hàng ô Buff (5 ô vuông viền xanh ngọc / xanh lá phát sáng như ảnh 2) -->
+            <div class="rpg-buffs-container">
+                <div id="buff-damage" class="rpg-buff-box" title="Sát thương">
+                    <span class="rpg-buff-name">DMG</span>
+                    <span id="buff-damage-val" class="rpg-buff-val">×1.0</span>
                 </div>
-                <div class="stat-bar-track">
-                    <div id="health-fill" class="stat-bar-fill health"></div>
+                <div id="buff-rapid" class="rpg-buff-box" title="Tốc độ bắn">
+                    <span class="rpg-buff-name">SPD</span>
+                    <span id="buff-rapid-val" class="rpg-buff-val">×1.0</span>
+                </div>
+                <div id="buff-multi" class="rpg-buff-box" title="Bắn nhiều tia">
+                    <span class="rpg-buff-name">MULTI</span>
+                    <span id="buff-multi-val" class="rpg-buff-val">1 TIA</span>
+                </div>
+                <div id="buff-shield" class="rpg-buff-box" title="Tự hồi khiên">
+                    <span class="rpg-buff-name">DEF</span>
+                    <span id="buff-shield-val" class="rpg-buff-val">REGEN</span>
+                </div>
+                <div id="buff-crit" class="rpg-buff-box" title="Chí mạng">
+                    <span class="rpg-buff-name">CRIT</span>
+                    <span id="buff-crit-val" class="rpg-buff-val">×2.0</span>
                 </div>
             </div>
 
-            <div class="score-display">
+            <div class="rpg-score-row">
                 <span class="score-label">SCORE</span>
                 <span id="score-value" class="score-digit">0</span>
             </div>
@@ -109,33 +148,49 @@
             <div id="floating-numbers" class="floating-numbers-container"></div>
         </div>
 
-        <!-- Bottom Right: Weapon & Ammo Card -->
-        <div class="hud-panel hud-bottom-right">
-            <div class="weapon-card">
-                <div class="weapon-info">
-                    <div id="weapon-name" class="weapon-name">BLASTER-X</div>
-                    <div class="weapon-slots">
-                        <span id="slot-1" class="weapon-slot active" title="Súng">
-                            <span class="weapon-slot-key">1</span>
-                            <img class="weapon-slot-icon gun-icon" src="assets/previews/kenney-blaster/blaster-a.png" alt="BLASTER-X">
-                        </span>
-                        <span id="slot-2" class="weapon-slot knife-slot" title="Dao">
-                            <span class="weapon-slot-key">2</span>
-                            <svg class="weapon-slot-icon knife-icon" viewBox="0 0 64 40" aria-label="Dao"><path d="M9 25 43 7q8-4 12 1-4 9-13 13L23 31z"/><path d="M22 27 14 36l-6-4 8-9z"/></svg>
-                        </span>
-                    </div>
+        <!-- Bottom Center: Weapon Hotbar (Phong cách Core Keeper / RPG Hotbar - Ảnh 1) -->
+        <div class="hud-bottom-center">
+            <div class="hotbar-header">
+                <div class="hotbar-weapon-title">
+                    <span id="weapon-name" class="weapon-name">BLASTER-X</span>
+                    <span class="hotbar-ammo-tag">
+                        <span id="ammo-current" class="ammo-num">16</span>
+                        <span class="ammo-slash">/</span>
+                        <span id="ammo-max" class="ammo-total">16 + 32</span>
+                    </span>
                 </div>
-
-                <div class="ammo-display">
-                    <span id="ammo-current" class="ammo-num">16</span>
-                    <span class="ammo-slash">/</span>
-                    <span id="ammo-max" class="ammo-total">16 + 32</span>
-                </div>
-
                 <div class="reload-track">
                     <div id="reload-progress-bar" class="reload-fill"></div>
                 </div>
                 <div id="upgrade-stats" class="upgrade-stats">DAME ×1.0 · TỐC BẮN ×1.00 · 1 TIA</div>
+            </div>
+
+            <div class="hotbar-slots-row">
+                <!-- Slot 1: Súng chính -->
+                <div id="slot-1" class="hotbar-slot active" title="Súng chính [Phím 1]">
+                    <span class="hotbar-key">1</span>
+                    <div class="hotbar-icon-wrap">
+                        <img class="hotbar-img" src="assets/previews/kenney-blaster/blaster-a.png" alt="Súng">
+                    </div>
+                </div>
+
+                <!-- Slot 2: Dao cận chiến -->
+                <div id="slot-2" class="hotbar-slot" title="Dao cận chiến [Phím 2]">
+                    <span class="hotbar-key">2</span>
+                    <div class="hotbar-icon-wrap">
+                        <span class="hotbar-knife-badge">DAO</span>
+                    </div>
+                </div>
+
+                <!-- Slot 3 to 10: Ô phụ phong cách Core Keeper như Ảnh 1 -->
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">3</span></div>
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">4</span></div>
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">5</span></div>
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">6</span></div>
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">7</span></div>
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">8</span></div>
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">9</span></div>
+                <div class="hotbar-slot slot-empty"><span class="hotbar-key">0</span></div>
             </div>
         </div>
 
@@ -190,7 +245,10 @@
                 </div>
                 <div id="room-status" class="room-status">Tạo phòng rồi gửi link này cho đồng đội. Bản public chạy online; bản local cần cùng Wi‑Fi.<br><small>Phòng yêu cầu ít nhất 2 người mới bắt đầu được.</small></div>
                 <div id="room-lobby" hidden aria-label="Người chơi trong phòng"></div>
-                <button id="room-start" class="btn-action room-start" style="display:none">BẮT ĐẦU PHÒNG</button>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 14px;">
+                    <button id="room-leave" class="btn-toggle" style="display:none; padding: 14px 20px; font-size: 13px;">RỜI PHÒNG</button>
+                    <button id="room-start" class="btn-action room-start" style="display:none; margin-top: 0;">BẮT ĐẦU PHÒNG</button>
+                </div>
             </div>
 
             <div class="controls-guide">

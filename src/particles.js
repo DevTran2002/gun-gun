@@ -54,29 +54,55 @@ export class ParticleSystem {
         });
     }
 
-    createKnifeSlash(position, direction, color = 0xdbe8ff) {
+    createKnifeSlash(position, direction, color = 0x99e6ff) {
         const slashGroup = new THREE.Group();
-        // Position slightly in front of the player
-        slashGroup.position.copy(position).addScaledVector(direction, 0.8);
+        slashGroup.position.copy(position).addScaledVector(direction, 1.1);
         
-        // Create an arc geometry for the slash
-        const geo = new THREE.PlaneGeometry(3.0, 0.6);
-        const mat = new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.9, side: THREE.DoubleSide });
-        const mesh = new THREE.Mesh(geo, mat);
-        
-        // Orient the slash facing the camera (or upright)
-        mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, -1), direction);
-        mesh.rotateZ((Math.random() - 0.5) * Math.PI * 0.5); // Random slant
+        // Vệt chém hình cung trăng khuyết 3D phát sáng
+        const arcGeo = new THREE.RingGeometry(1.6, 3.4, 28, 1, -Math.PI * 0.38, Math.PI * 0.76);
+        const arcMat = new THREE.MeshBasicMaterial({
+            color: color,
+            transparent: true,
+            opacity: 0.95,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+        const arcMesh = new THREE.Mesh(arcGeo, arcMat);
 
-        slashGroup.add(mesh);
+        // Lưỡi kiếm neon trắng ở rìa tạo độ sắc bén
+        const coreGeo = new THREE.RingGeometry(2.6, 3.4, 28, 1, -Math.PI * 0.35, Math.PI * 0.70);
+        const coreMat = new THREE.MeshBasicMaterial({
+            color: 0xffffff,
+            transparent: true,
+            opacity: 0.85,
+            side: THREE.DoubleSide,
+            blending: THREE.AdditiveBlending
+        });
+        const coreMesh = new THREE.Mesh(coreGeo, coreMat);
+        coreMesh.position.z = 0.01;
+
+        slashGroup.add(arcMesh, coreMesh);
+        
+        // Định hướng vệt chém theo hướng nhìn
+        slashGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), direction);
+        slashGroup.rotateZ(-0.25 + (Math.random() - 0.5) * 0.2);
+
         this.scene.add(slashGroup);
         
+        // Bắn tia lửa chém dọc theo cung
+        this.createImpactSparks(slashGroup.position, direction, color, 6);
+
         this.muzzleFlashes.push({
             obj: slashGroup,
-            mat: mat,
-            life: 0.12,
-            maxLife: 0.12,
-            scaleSpeed: 2.5
+            mat: arcMat,
+            extraMat: coreMat,
+            onUpdate: (delta, progress) => {
+                const expand = 1.0 + (1 - progress) * 0.45;
+                slashGroup.scale.set(expand, expand, expand);
+                slashGroup.rotateZ(delta * 14);
+            },
+            life: 0.16,
+            maxLife: 0.16
         });
     }
 
@@ -173,12 +199,20 @@ export class ParticleSystem {
         for (let i = this.muzzleFlashes.length - 1; i >= 0; i--) {
             const f = this.muzzleFlashes[i];
             f.life -= delta;
-            const progress = f.life / f.maxLife;
+            const progress = Math.max(0, f.life / f.maxLife);
             if (f.light) f.light.intensity = progress * 8;
             if (f.mat) f.mat.opacity = progress;
+            if (f.extraMat) f.extraMat.opacity = progress * 0.85;
+            if (f.onUpdate) f.onUpdate(delta, progress);
 
             if (f.life <= 0) {
                 this.scene.remove(f.obj);
+                if (f.obj.traverse) {
+                    f.obj.traverse(c => {
+                        if (c.geometry) c.geometry.dispose();
+                        if (c.material) c.material.dispose();
+                    });
+                }
                 this.muzzleFlashes.splice(i, 1);
             }
         }

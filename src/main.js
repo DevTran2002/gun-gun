@@ -102,6 +102,7 @@ class CyberArenaGame {
         this.roomStart = document.getElementById('room-start');
         this.roomCreate = document.getElementById('room-create');
         this.roomJoin = document.getElementById('room-join');
+        this.roomLeave = document.getElementById('room-leave');
         this.characterOptions = [...document.querySelectorAll('[data-character]')];
         this.characterOptions.forEach(option => option.addEventListener('click', () => this.selectCharacter(option.dataset.character)));
         this.updateCharacterSelection();
@@ -109,6 +110,7 @@ class CyberArenaGame {
         this.roomJoin?.addEventListener('click', () => this.joinRoom());
         this.roomCopy?.addEventListener('click', () => this.copyRoomCode());
         this.roomStart?.addEventListener('click', () => this.network.start().catch(e => this.showRoomError(e.message)));
+        this.roomLeave?.addEventListener('click', () => this.network.leave());
 
         this.finalScoreEl = document.getElementById('final-score');
         this.finalWaveEl = document.getElementById('final-wave');
@@ -301,6 +303,9 @@ class CyberArenaGame {
         localStorage.setItem('cyber_arena_character', this.characterId);
         this.updateCharacterSelection();
         this.player.setCharacter(this.characterId);
+        if (this.network?.active) {
+            this.network.changeCharacter?.(this.characterId);
+        }
     }
 
     updateCharacterSelection() {
@@ -328,19 +333,36 @@ class CyberArenaGame {
     }
 
     showRoomState(data) {
+        if (!data) return;
         this.roomLobby?.update(data);
         this.screenMenu?.classList.add('party-menu');
         if (!this.roomStatus) return;
+        const isHost = data.host === data.you || data.isHost;
         const names = (data.players || []).map(player => player.name).join(', ');
-        this.roomStatus.textContent = `PHÒNG ${data.code}: ${names}${data.host === data.you ? ' • Bấm BẮT ĐẦU PHÒNG' : ' • Chờ chủ phòng'}`;
+        this.roomStatus.textContent = `PHÒNG ${data.code}: ${names}${isHost ? ' • Bấm BẮT ĐẦU PHÒNG' : ' • Chờ chủ phòng'}`;
         if (this.roomCode) this.roomCode.value = data.code;
         if (this.roomCopy) this.roomCopy.style.display = 'inline-block';
-        if (this.roomStart) this.roomStart.style.display = data.host === data.you ? 'inline-block' : 'none';
-        if (this.roomStart) this.roomStart.disabled = (data.players || []).length < 2 || data.started;
+        if (this.roomStart) this.roomStart.style.display = isHost ? 'inline-block' : 'none';
+        if (this.roomStart) this.roomStart.disabled = (data.players || []).length < 1 || data.started;
+        if (this.roomLeave) this.roomLeave.style.display = 'inline-block';
         this.characterOptions?.forEach(option => { option.disabled = !!data.started; });
         if (this.roomCreate) this.roomCreate.disabled = true;
         if (this.roomJoin) this.roomJoin.disabled = true;
         if (this.btnStart) this.btnStart.style.display = 'none';
+    }
+
+    resetRoomUI() {
+        this.screenMenu?.classList.remove('party-menu');
+        if (this.roomLobby?.container) this.roomLobby.container.hidden = true;
+        if (this.roomStatus) this.roomStatus.textContent = 'Tạo phòng rồi gửi link này cho đồng đội. Bản public chạy online; bản local cần cùng Wi‑Fi.';
+        if (this.roomCode) this.roomCode.value = '';
+        if (this.roomCopy) this.roomCopy.style.display = 'none';
+        if (this.roomStart) this.roomStart.style.display = 'none';
+        if (this.roomLeave) this.roomLeave.style.display = 'none';
+        if (this.roomCreate) this.roomCreate.disabled = false;
+        if (this.roomJoin) this.roomJoin.disabled = false;
+        if (this.btnStart) this.btnStart.style.display = 'inline-block';
+        this.characterOptions?.forEach(option => { option.disabled = false; });
     }
 
     ensureCoopPlayer(id, name, character = 'soldier') {

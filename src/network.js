@@ -38,8 +38,9 @@ export class NetworkRoom {
                 this.game.player.setCharacter(character);
                 this.game.player.cooperative = true;
                 this.game.weapons.onCommand = null;
-                this.game.showRoomState({ code, players: this.players, isHost: true });
-                resolve({ code, you: 'host' });
+                const roomData = { code, host: 'host', you: 'host', players: this.players, isHost: true };
+                this.game.showRoomState(roomData);
+                resolve(roomData);
             });
 
             this.peer.on('error', (err) => {
@@ -58,8 +59,14 @@ export class NetworkRoom {
                         pName = data.name;
                         pChar = data.character;
                         this.players.push({ id: pId, name: pName, character: pChar });
-                        conn.send({ type: 'accept', you: pId, epoch: this.epoch, players: this.players });
+                        conn.send({ type: 'accept', you: pId, epoch: this.epoch, players: this.players, host: 'host' });
                         this.broadcastRoster();
+                    } else if (data.type === 'character') {
+                        const p = this.players.find(pl => pl.id === pId);
+                        if (p) {
+                            p.character = data.character;
+                            this.broadcastRoster();
+                        }
                     } else if (data.type === 'sync') {
                         clientState.input = data.input;
                         if (data.commands && data.commands.length > 0) {
@@ -78,10 +85,10 @@ export class NetworkRoom {
     }
 
     broadcastRoster() {
-        const data = { type: 'roster', players: this.players };
+        const data = { type: 'roster', players: this.players, host: 'host' };
         for (const c of this.connections) c.conn.send(data);
         this.updateRoster(this.players);
-        this.game.showRoomState({ code: this.code, players: this.players, isHost: true });
+        this.game.showRoomState({ code: this.code, host: 'host', you: 'host', players: this.players, isHost: true });
     }
 
     async join(code, name, character = 'soldier') {
@@ -109,11 +116,12 @@ export class NetworkRoom {
                         this.game.weapons.onCommand = (cmd) => this.sendCommand(cmd);
                         
                         this.updateRoster(data.players || []);
-                        this.game.showRoomState({ code, players: data.players, isHost: false });
-                        resolve(data);
+                        const roomData = { code, host: data.host || 'host', you: data.you, players: data.players || [], isHost: false };
+                        this.game.showRoomState(roomData);
+                        resolve(roomData);
                     } else if (data.type === 'roster') {
                         this.updateRoster(data.players || []);
-                        this.game.showRoomState({ code: this.code, players: data.players, isHost: false });
+                        this.game.showRoomState({ code: this.code, host: data.host || 'host', you: this.playerId, players: data.players || [], isHost: false });
                     } else if (data.type === 'start') {
                         this.epoch = data.epoch;
                         this.game.startGame(true);
@@ -145,7 +153,7 @@ export class NetworkRoom {
         if (!this.host) return;
         this.epoch = Date.now();
         this.game.startGame(true);
-        this.game.showRoomState({ code: this.code, players: this.players, isHost: true });
+        this.game.showRoomState({ code: this.code, host: 'host', you: 'host', players: this.players, isHost: true, started: true });
         const data = { type: 'start', epoch: this.epoch };
         for (const c of this.connections) c.conn.send(data);
     }
@@ -241,11 +249,27 @@ export class NetworkRoom {
         }
     }
 
+    changeCharacter(character) {
+        if (!this.active) return;
+        if (this.host) {
+            const hostPlayer = this.players.find(p => p.id === 'host');
+            if (hostPlayer) {
+                hostPlayer.character = character;
+                this.broadcastRoster();
+            }
+        } else if (this.conn && this.conn.open) {
+            this.conn.send({ type: 'character', character });
+        }
+    }
+
     leave() {
         if (!this.active) return;
         this.active = false;
         if (this.conn) this.conn.close();
         if (this.peer) this.peer.destroy();
+        this.connections = [];
+        this.players = [];
+        this.game.resetRoomUI?.();
     }
 }
 

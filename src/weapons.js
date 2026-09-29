@@ -76,10 +76,10 @@ export const RARE_WEAPON_CONFIGS = [
 export const KNIFE_CONFIG = {
     id: 'knife',
     name: 'COMBAT KNIFE',
-    damage: 48,
-    fireRate: 0.42,
-    range: 2.35,
-    color: 0xdbe8ff,
+    damage: 75,
+    fireRate: 0.32,
+    range: 3.5,
+    color: 0x99e6ff,
     isKnife: true,
     isAuto: false,
     pellets: 1
@@ -357,16 +357,16 @@ export class WeaponSystem {
             if (direction.lengthSq() < 0.001) direction.set(0, 0, -1);
             direction.normalize();
             this.fireCooldown = w.fireRate;
-            sounds.play('enemyAttack', { volume: 0.45, rate: 1.45 });
+            sounds.play('enemyAttack', { volume: 0.5, rate: 1.45 });
             this.particles.createKnifeSlash(origin, direction, w.color);
             this.projectiles.push({
                 mesh: null,
                 origin: origin.clone(),
                 direction,
                 range: w.range,
-                damage: w.damage * damageMultiplier,
-                critMultiplier: 1,
-                life: 0.08,
+                damage: w.damage * damageMultiplier * (isPlayer ? this.damageBoost : 1),
+                critMultiplier: 1.8,
+                life: 0.12,
                 isPlayer,
                 isKnife: true,
                 ownerId: 'player'
@@ -484,27 +484,51 @@ export class WeaponSystem {
 
             if (p.isKnife) {
                 const startPos = p.origin;
-                const ray = new THREE.Ray(startPos, p.direction);
-                const endPos = startPos.clone().addScaledVector(p.direction, p.range);
-                let blocked = false;
-                for (const col of arena.colliders) {
-                    const hit = ray.intersectBox(col, new THREE.Vector3());
-                    if (hit && startPos.distanceTo(hit) <= p.range) {
-                        blocked = true;
-                        break;
-                    }
-                }
-                if (!blocked && p.isPlayer) {
+                const forward = p.direction.clone().setY(0).normalize();
+                const slashRange = p.range;
+                let hitCount = 0;
+
+                if (p.isPlayer) {
                     for (const enemy of enemies) {
                         if (enemy.isDead) continue;
-                        const hitInfo = enemy.checkHit(startPos, endPos, ray);
-                        if (hitInfo.hit) {
-                            const finalDamage = p.damage * (hitInfo.isCrit ? p.critMultiplier : 1);
-                            enemy.takeDamage(finalDamage, hitInfo.isCrit, p.direction);
-                            this.particles.createImpactSparks(hitInfo.point, p.direction.clone().negate(), 0xdbe8ff, 8);
-                            if (onHitCallback) onHitCallback(finalDamage, hitInfo.isCrit, hitInfo.point);
-                            break;
+                        const toEnemy = enemy.position.clone().sub(startPos);
+                        const dist = toEnemy.length();
+                        if (dist > slashRange + (enemy.radius || 0.6)) continue;
+                        if (Math.abs(toEnemy.y) > 2.2) continue;
+
+                        const toEnemyHoriz = toEnemy.clone().setY(0).normalize();
+                        const dot = forward.dot(toEnemyHoriz);
+                        if (dot < 0.25) continue; // Cung quét chém ~150 độ cực kỳ rộng và dễ trúng
+
+                        // Check cản tường giữa người chơi và mục tiêu
+                        const checkRay = new THREE.Ray(startPos, toEnemy.clone().normalize());
+                        let blocked = false;
+                        for (const col of arena.colliders) {
+                            const hit = checkRay.intersectBox(col, new THREE.Vector3());
+                            if (hit && startPos.distanceTo(hit) < dist - 0.3) {
+                                blocked = true;
+                                break;
+                            }
                         }
+                        if (blocked) continue;
+
+                        hitCount++;
+                        const isCrit = dot > 0.82 && (Math.random() < 0.35);
+                        const finalDamage = p.damage * (isCrit ? p.critMultiplier : 1.0);
+
+                        // Knockback nhẹ zombie lùi về sau theo hướng chém
+                        if (enemy.velocity) {
+                            enemy.velocity.add(toEnemyHoriz.clone().multiplyScalar(4.5));
+                        }
+
+                        enemy.takeDamage(finalDamage, isCrit, forward);
+                        const hitPoint = enemy.position.clone().add(new THREE.Vector3(0, 1.0, 0));
+                        this.particles.createImpactSparks(hitPoint, forward.clone().negate(), isCrit ? 0xff2255 : 0x99e6ff, isCrit ? 14 : 9);
+                        if (onHitCallback) onHitCallback(finalDamage, isCrit, hitPoint);
+                    }
+
+                    if (hitCount > 0) {
+                        sounds.playHitMarker(false);
                     }
                 }
                 this.removeProjectile(i);

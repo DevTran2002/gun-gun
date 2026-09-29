@@ -29,6 +29,20 @@ export class UIManager {
         this.healthText = document.getElementById('health-text');
         this.shieldFill = document.getElementById('shield-fill');
         this.shieldText = document.getElementById('shield-text');
+        this.staminaFill = document.getElementById('stamina-fill');
+        this.staminaText = document.getElementById('stamina-text');
+
+        this.buffDamage = document.getElementById('buff-damage');
+        this.buffDamageVal = document.getElementById('buff-damage-val');
+        this.buffRapid = document.getElementById('buff-rapid');
+        this.buffRapidVal = document.getElementById('buff-rapid-val');
+        this.buffMulti = document.getElementById('buff-multi');
+        this.buffMultiVal = document.getElementById('buff-multi-val');
+        this.buffShield = document.getElementById('buff-shield');
+        this.buffShieldVal = document.getElementById('buff-shield-val');
+        this.buffCrit = document.getElementById('buff-crit');
+        this.buffCritVal = document.getElementById('buff-crit-val');
+
         this.scoreVal = document.getElementById('score-value');
         this.waveVal = document.getElementById('wave-value');
         this.enemiesVal = document.getElementById('enemies-value');
@@ -74,15 +88,62 @@ export class UIManager {
             element.style.top = `${player.pointerScreen.y}px`;
             element.style.display = player.pointerInCanvas ? '' : 'none';
         }
-        // Health
-        const hpPercent = Math.max(0, (player.health / player.maxHealth) * 100);
+
+        // 1. Health Bar (Đỏ)
+        const hpPercent = Math.max(0, Math.min(100, (player.health / player.maxHealth) * 100));
         if (this.healthFill) this.healthFill.style.width = `${hpPercent}%`;
         if (this.healthText) this.healthText.textContent = `${Math.ceil(player.health)} / ${player.maxHealth}`;
 
-        // Shield
-        const shPercent = Math.max(0, (player.shield / player.maxShield) * 100);
+        // 2. Shield Bar (Xanh lam)
+        const shPercent = Math.max(0, Math.min(100, (player.shield / player.maxShield) * 100));
         if (this.shieldFill) this.shieldFill.style.width = `${shPercent}%`;
         if (this.shieldText) this.shieldText.textContent = `${Math.ceil(player.shield)} / ${player.maxShield}`;
+
+        // Weapon & Ammo info
+        const ammoInfo = player.weapons.getCurrentAmmo();
+        const curWeapon = player.weapons.getCurrentWeapon();
+
+        // 3. Stamina / Ammo Bar (Cam - thanh thứ 3 giống Ảnh 2)
+        if (this.staminaFill) {
+            let stPercent = 100;
+            if (!curWeapon.isKnife) {
+                if (ammoInfo.isReloading) {
+                    stPercent = Math.max(0, Math.min(100, ammoInfo.reloadProgress * 100));
+                    if (this.staminaText) this.staminaText.textContent = `NẠP ĐẠN ${Math.round(stPercent)}%`;
+                } else {
+                    stPercent = Math.max(0, Math.min(100, (ammoInfo.current / ammoInfo.max) * 100));
+                    if (this.staminaText) this.staminaText.textContent = `BĂNG ĐẠN ${ammoInfo.current}/${ammoInfo.max}`;
+                }
+            } else {
+                stPercent = 100;
+                if (this.staminaText) this.staminaText.textContent = 'CẬN CHIẾN';
+            }
+            this.staminaFill.style.width = `${stPercent}%`;
+        }
+
+        // 4. Hàng ô Buff RPG (Ảnh 2)
+        const upgrades = player.weapons.upgrades;
+        if (this.buffDamage) {
+            this.buffDamage.classList.toggle('active', upgrades.damage > 0);
+            if (this.buffDamageVal) this.buffDamageVal.textContent = `×${player.weapons.damageBoost.toFixed(1)}`;
+        }
+        if (this.buffRapid) {
+            this.buffRapid.classList.toggle('active', upgrades.rapid > 0);
+            if (this.buffRapidVal) this.buffRapidVal.textContent = `×${player.weapons.fireRateBoost.toFixed(2)}`;
+        }
+        if (this.buffMulti) {
+            this.buffMulti.classList.toggle('active', upgrades.multishot > 0);
+            if (this.buffMultiVal) this.buffMultiVal.textContent = `${player.weapons.beamCount} TIA`;
+        }
+        if (this.buffShield) {
+            const isRegening = player.shieldRegenTimer <= 0 && player.shield < player.maxShield;
+            this.buffShield.classList.toggle('active', isRegening || player.shield >= player.maxShield);
+            if (this.buffShieldVal) this.buffShieldVal.textContent = isRegening ? 'REGEN' : (player.shield >= player.maxShield ? 'FULL' : 'WAIT');
+        }
+        if (this.buffCrit) {
+            this.buffCrit.classList.toggle('active', true);
+            if (this.buffCritVal) this.buffCritVal.textContent = `×${(curWeapon.critMultiplier || 2.0).toFixed(1)}`;
+        }
 
         // Low health vignette
         if (this.damageVignette) {
@@ -98,16 +159,14 @@ export class UIManager {
         if (this.waveVal) this.waveVal.textContent = waveManager.currentPhase;
         if (this.enemiesVal) this.enemiesVal.textContent = waveManager.getRemainingEnemiesCount();
 
-        // Weapon & Ammo
-        const ammoInfo = player.weapons.getCurrentAmmo();
-        const curWeapon = player.weapons.getCurrentWeapon();
+        // Hotbar Weapon Title & Ammo
         if (this.weaponName) this.weaponName.textContent = curWeapon.name;
         if (this.weaponName) this.weaponName.classList.toggle('rare', !!curWeapon.tier);
         if (this.upgradeStats) {
             this.upgradeStats.textContent = `DAME ×${player.weapons.damageBoost.toFixed(1)} · TỐC BẮN ×${player.weapons.fireRateBoost.toFixed(2)} · ${player.weapons.beamCount} TIA`;
         }
         if (this.ammoCurrent) this.ammoCurrent.textContent = ammoInfo.current;
-        if (this.ammoMax) this.ammoMax.textContent = ammoInfo.isKnife ? 'DAO' : `${ammoInfo.max} + ${ammoInfo.reserve}`;
+        if (this.ammoMax) this.ammoMax.textContent = ammoInfo.isKnife ? 'CẬN CHIẾN' : `${ammoInfo.max} + ${ammoInfo.reserve}`;
 
         if (this.reloadBar) {
             if (ammoInfo.isReloading) {
@@ -119,9 +178,15 @@ export class UIManager {
             }
         }
 
-        // Weapon slots
+        // Hotbar Slots
         this.weaponSlots.forEach((slot, idx) => {
             if (slot) {
+                if (!slot._clickBound) {
+                    slot._clickBound = true;
+                    slot.addEventListener('click', () => {
+                        player.weapons?.switchWeapon(idx);
+                    });
+                }
                 const weapon = player.weapons.weaponSlots[idx];
                 if (!weapon) return;
                 slot.classList.toggle('rare', !!weapon.tier);
