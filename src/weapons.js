@@ -19,9 +19,9 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 1,
         recoilPitch: 0.025,
-        scale: 1.8,
-        offset: new THREE.Vector3(-0.05, -0.5, 0.2),
-        rotOffset: new THREE.Euler(Math.PI * -0.1, Math.PI * 0.35, 0)
+        scale: 0.24,
+        offset: new THREE.Vector3(-0.24, -0.05, 0.02),
+        rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     },
     {
         id: 'repeater',
@@ -40,9 +40,9 @@ export const WEAPON_CONFIGS = [
         isAuto: true,
         pellets: 1,
         recoilPitch: 0.018,
-        scale: 1.8,
-        offset: new THREE.Vector3(-0.05, -0.5, 0.2),
-        rotOffset: new THREE.Euler(Math.PI * -0.1, Math.PI * 0.35, 0)
+        scale: 0.24,
+        offset: new THREE.Vector3(-0.24, -0.05, 0.02),
+        rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     },
     {
         id: 'scatter',
@@ -61,9 +61,9 @@ export const WEAPON_CONFIGS = [
         isAuto: false,
         pellets: 6,
         recoilPitch: 0.06,
-        scale: 1.8,
-        offset: new THREE.Vector3(-0.05, -0.5, 0.2),
-        rotOffset: new THREE.Euler(Math.PI * -0.1, Math.PI * 0.35, 0)
+        scale: 0.24,
+        offset: new THREE.Vector3(-0.24, -0.05, 0.02),
+        rotOffset: new THREE.Euler(0, Math.PI * 0.35, 0)
     }
 ];
 
