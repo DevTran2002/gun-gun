@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zombie Strike: Infinite Invasions</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "./libs/three.module.js",
+            "three/addons/": "./libs/"
+        }
+    }
+    </script>
+</head>
+<body>
+    <!-- 3D Canvas -->
+    <canvas id="game-canvas"></canvas>
+
+    <!-- Damage Screen Vignette Effect -->
+    <div id="damage-vignette"></div>
+
+    <!-- HUD Overlay -->
+    <div id="hud" style="display: none;">
+        <!-- Top Left: Health, Shield & Score -->
+        <div class="hud-panel hud-top-left">
+            <div class="stat-group">
+                <div class="stat-label">
+                    <span class="label-tag">SHIELD</span>
+                    <span id="shield-text" class="stat-num">100 / 100</span>
+                </div>
+                <div class="stat-bar-track">
+                    <div id="shield-fill" class="stat-bar-fill shield"></div>
+                </div>
+            </div>
+
+            <div class="stat-group">
+                <div class="stat-label">
+                    <span class="label-tag">HEALTH</span>
+                    <span id="health-text" class="stat-num">100 / 100</span>
+                </div>
+                <div class="stat-bar-track">
+                    <div id="health-fill" class="stat-bar-fill health"></div>
+                </div>
+            </div>
+
+            <div class="score-display">
+                <span class="score-label">SCORE</span>
+                <span id="score-value" class="score-digit">0</span>
+            </div>
+        </div>
+
+        <!-- Top Center: Phase & Zombies Remaining -->
+        <div class="hud-top-center">
+            <div class="wave-card">
+                <div class="wave-header">
+                    <span class="wave-sub">SURVIVAL</span>
+                    <span class="wave-title">PHASE <span id="wave-value">1</span></span>
+                </div>
+                <div class="enemies-badge">
+                    ZOMBIES: <span id="enemies-value">0</span>
+                </div>
+            </div>
+
+            <!-- Boss Health Bar -->
+            <div id="boss-health-container" style="display: none;">
+                <div class="boss-label">MUTANT OVERLORD</div>
+                <div class="boss-bar-track">
+                    <div id="boss-health-fill" class="boss-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Top Right: Radar / Mini-map -->
+        <div class="hud-panel hud-top-right">
+            <div class="radar-title">TACTICAL RADAR</div>
+            <div class="radar-wrapper">
+                <canvas id="radar-canvas" width="140" height="140"></canvas>
+            </div>
+        </div>
+
+        <!-- Center Crosshair & Notifications -->
+            <div id="crosshair" class="crosshair">
+                <div class="cross-dot"></div>
+                <div class="cross-line top"></div>
+                <div class="cross-line bottom"></div>
+                <div class="cross-line left"></div>
+                <div class="cross-line right"></div>
+            </div>
+
+            <div id="hitmarker" class="hitmarker">
+                <div class="marker-arm arm-tl"></div>
+                <div class="marker-arm arm-tr"></div>
+                <div class="marker-arm arm-bl"></div>
+                <div class="marker-arm arm-br"></div>
+            </div>
+
+        <div class="hud-center">
+            <div id="announcement-banner" class="announcement-banner"></div>
+            <div id="pickup-alert" class="pickup-alert"></div>
+            <div id="floating-numbers" class="floating-numbers-container"></div>
+        </div>
+
+        <!-- Bottom Right: Weapon & Ammo Card -->
+        <div class="hud-panel hud-bottom-right">
+            <div class="weapon-card">
+                <div class="weapon-info">
+                    <div id="weapon-name" class="weapon-name">BLASTER-X</div>
+                    <div class="weapon-slots">
+                        <span id="slot-1" class="weapon-slot active" title="Súng">
+                            <span class="weapon-slot-key">1</span>
+                            <svg class="weapon-slot-icon gun-icon" viewBox="0 0 64 40" aria-label="Súng"><path d="M5 13h30l8 5h14v9H39l-7 5H20v-8H5z"/><path d="M22 29h9l-3 8h-8z"/><path d="M46 18V8h7v10z"/></svg>
+                        </span>
+                        <span id="slot-2" class="weapon-slot knife-slot" title="Dao">
+                            <span class="weapon-slot-key">2</span>
+                            <svg class="weapon-slot-icon knife-icon" viewBox="0 0 64 40" aria-label="Dao"><path d="M9 25 43 7q8-4 12 1-4 9-13 13L23 31z"/><path d="M22 27 14 36l-6-4 8-9z"/></svg>
+                        </span>
+                    </div>
+                </div>
+
+                <div class="ammo-display">
+                    <span id="ammo-current" class="ammo-num">16</span>
+                    <span class="ammo-slash">/</span>
+                    <span id="ammo-max" class="ammo-total">16 + 32</span>
+                </div>
+
+                <div class="reload-track">
+                    <div id="reload-progress-bar" class="reload-fill"></div>
+                </div>
+                <div id="upgrade-stats" class="upgrade-stats">DAME ×1.0 · TỐC BẮN ×1.00 · 1 TIA</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 1: Loading Screen -->
+    <div id="screen-loading" class="screen-overlay">
+        <div class="menu-box">
+            <h1 class="game-logo">ZOMBIE ARENA</h1>
+            <p class="game-sublogo">INFINITE PHASE SURVIVAL</p>
+            <div class="loading-track">
+                <div id="loading-bar-fill" class="loading-fill"></div>
+            </div>
+            <div id="loading-status-text" class="status-msg">Loading Kenney 3D Zombies & Portals...</div>
+        </div>
+    </div>
+
+    <!-- Screen 2: Start Menu -->
+    <div id="screen-menu" class="screen-overlay" style="display: none;">
+        <div class="menu-box">
+            <h1 class="game-logo">ZOMBIE ARENA</h1>
+            <p class="game-sublogo">GÓC NHÌN TỪ TRÊN • CAMERA CỐ ĐỊNH</p>
+            <div class="mutation-guide">
+                <span class="runner">TỐC HÀNH <small>Phase 2 · Chạy áp sát</small></span>
+                <span class="acid">PHUN AXIT <small>Phase 2 · Né đạn xanh</small></span>
+                <span class="giant">KHỔNG LỒ <small>Phase 3 · Tránh vòng giậm</small></span>
+            </div>
+            <p class="loot-guide">Zombie chỉ có 10% cơ hội rơi đồ. Nhặt đạn để nạp súng; khi hết đạn, chuyển sang dao ở ô 2.<br>Nâng cấp cộng dồn đến hết lượt chơi.</p>
+
+            <div class="room-panel">
+                <div class="room-title">PHÒNG ONLINE • TỐI ĐA 4 NGƯỜI</div>
+                <input id="room-name" maxlength="24" placeholder="Tên của bạn" value="Người chơi">
+                <div class="room-actions">
+                    <button id="room-create" class="btn-toggle">TẠO PHÒNG</button>
+                    <input id="room-code" maxlength="6" placeholder="MÃ PHÒNG">
+                    <button id="room-join" class="btn-toggle">VÀO PHÒNG</button>
+                </div>
+                <div id="room-status" class="room-status">Tạo phòng rồi gửi link này cho đồng đội. Bản public chạy online; bản local cần cùng Wi‑Fi.<br><small>Phòng yêu cầu ít nhất 2 người mới bắt đầu được.</small></div>
+                <button id="room-start" class="btn-action room-start" style="display:none">BẮT ĐẦU PHÒNG</button>
+            </div>
+
+            <div class="controls-guide">
+                <div class="guide-col">
+                    <div class="guide-item"><span class="key-badge">WASD</span><span>Di chuyển theo màn hình</span></div>
+                    <div class="guide-item"><span class="key-badge">SPACE</span><span>Nhảy cao</span></div>
+                    <div class="guide-item"><span class="key-badge">E</span><span>Nhấn E gần đồng đội bị hạ để hồi sinh</span></div>
+                    <div class="guide-item"><span class="key-badge">Q</span><span>Luot ne don</span></div>
+                </div>
+                <div class="guide-col">
+                    <div class="guide-item"><span class="key-badge">CHUỘT</span><span>Di chuột ngắm · Giữ trái bắn</span></div>
+                    <div class="guide-item"><span class="key-badge">CHUỘT PHẢI</span><span>Bắn chính xác</span></div>
+                    <div class="guide-item"><span class="key-badge">1 / 2</span><span>1 súng · 2 dao</span></div>
+                    <div class="guide-item"><span class="key-badge">R</span><span>Nap dan</span></div>
+                </div>
+            </div>
+
+            <div class="highscore-badge">
+                KY LUC: <span id="menu-highscore">0</span> DIEM
+            </div>
+
+            <button id="btn-start" class="btn-action pulse">BAT DAU TAC CHIEN</button>
+        </div>
+    </div>
+
+    <!-- Screen 3: Pause Menu -->
+    <div id="screen-pause" class="screen-overlay" style="display: none;">
+        <div class="menu-box">
+            <h2 class="menu-heading">TAM DUNG CHIEN DAU</h2>
+            <div class="menu-buttons">
+                <button id="btn-resume" class="btn-action">TIEP TUC</button>
+                <button id="btn-restart-pause" class="btn-action secondary">CHOI LAI</button>
+                <div class="toggle-row">
+                    <button id="toggle-sound" class="btn-toggle">SOUND: ON</button>
+                    <button id="toggle-music" class="btn-toggle">MUSIC: ON</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Screen 4: Game Over Screen -->
+    <div id="screen-gameover" class="screen-overlay" style="display: none;">
+        <div class="menu-box defeat">
+            <h2 class="menu-heading danger">CHIEN DICH THAT BAI</h2>
+            <div class="gameover-stats">
+                <div class="result-row">
+                    <span>DIEM SO CUOI CUNG:</span>
+                    <span id="final-score" class="highlight-val">0</span>
+                </div>
+                <div class="result-row">
+                    <span>PHASE DA VUOT QUA:</span>
+                    <span id="final-wave" class="highlight-val">0</span>
+                </div>
+                <div class="result-row">
+                    <span>DIEM CAO NHAT:</span>
+                    <span id="gameover-highscore" class="highlight-val">0</span>
+                </div>
+            </div>
+            <button id="btn-restart-gameover" class="btn-action pulse">THU LAI NGAY</button>
+        </div>
+    </div>
+
+    <!-- Main Game Script -->
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
