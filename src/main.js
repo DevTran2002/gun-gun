@@ -420,7 +420,7 @@ class CyberArenaGame {
             const remote = this.ensureCoopPlayer(state.id, state.name, state.character);
             const nextPosition = new THREE.Vector3().fromArray(state.position);
             if (remote.netTarget) {
-                const elapsed = Math.max(0.05, (sampleTime - (remote.netSampleTime || sampleTime)) / 1000);
+                const elapsed = Math.max(0.02, (sampleTime - (remote.netSampleTime || sampleTime)) / 1000);
                 remote.netVelocity.copy(nextPosition).sub(remote.netTarget).divideScalar(elapsed);
                 remote.netVelocity.y = 0;
             }
