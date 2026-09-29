@@ -9,73 +9,146 @@ export class NetworkRoom {
         this.active = false;
         this.host = false;
         this.code = '';
-        this.token = '';
         this.playerId = '';
         this.seq = 0;
         this.pendingCommands = [];
-        this.ack = 0;
         this.pollTimer = 0;
         this.error = '';
-        this.remote = new Map();
-        this.syncing = false;
-    }
-
-    async request(action, payload = {}) {
-        const response = await fetch(`/api/rooms/${action}`, {
-            method: 'POST', headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-        });
-        const contentType = response.headers.get('content-type') || '';
-        const raw = await response.text();
-        let data = null;
-        if (contentType.includes('application/json')) {
-            try { data = JSON.parse(raw); } catch { data = null; }
-        }
-        if (!response.ok) {
-            if (response.status === 501 || response.status === 405 || !data) {
-                throw new Error('Cổng này đang chạy server cũ. Hãy mở terminal mới, chạy “$env:PORT=8091; py server.py”, rồi mở lại http://localhost:8091.');
-            }
-            throw new Error(data.error || 'Không thể kết nối phòng.');
-        }
-        if (!data) {
-            throw new Error('Máy chủ phòng LAN trả về dữ liệu không hợp lệ. Hãy chạy “$env:PORT=8091; py server.py” rồi mở lại http://localhost:8091.');
-        }
-        return data;
+        
+        this.peer = null;
+        this.conn = null;
+        this.connections = [];
+        this.players = [];
     }
 
     async create(name, character = 'soldier') {
-        const data = await this.request('create', { name, character });
-        this.accept(data, true);
-        return data;
+        return new Promise((resolve, reject) => {
+            const code = Math.random().toString(36).substring(2, 6).toUpperCase();
+            this.peer = new window.Peer('gungun-room-' + code);
+            
+            this.peer.on('open', (id) => {
+                this.active = true;
+                this.host = true;
+                this.code = code;
+                this.playerId = 'host';
+                this.epoch = Date.now();
+                this.connections = [];
+                this.players = [{ id: 'host', name, character }];
+                
+                this.game.player.setCharacter(character);
+                this.game.player.cooperative = true;
+                this.game.weapons.onCommand = null;
+                this.game.showRoomState({ code, players: this.players, isHost: true });
+                resolve({ code, you: 'host' });
+            });
+
+            this.peer.on('error', (err) => {
+                reject(new Error("Không thể tạo phòng, có thể lỗi mạng: " + err.message));
+            });
+            
+            this.peer.on('connection', (conn) => {
+                let pId = 'p' + Math.random().toString(36).substring(2, 8);
+                let pName = 'Player';
+                let pChar = 'soldier';
+                let clientState = { id: pId, conn, input: {}, commands: [], ack: 0 };
+                this.connections.push(clientState);
+                
+                conn.on('data', (data) => {
+                    if (data.type === 'join') {
+                        pName = data.name;
+                        pChar = data.character;
+                        this.players.push({ id: pId, name: pName, character: pChar });
+                        conn.send({ type: 'accept', you: pId, epoch: this.epoch, players: this.players });
+                        this.broadcastRoster();
+                    } else if (data.type === 'sync') {
+                        clientState.input = data.input;
+                        if (data.commands && data.commands.length > 0) {
+                            this.applyCommands([{ player: pId, commands: data.commands }]);
+                        }
+                    }
+                });
+                
+                conn.on('close', () => {
+                    this.connections = this.connections.filter(c => c.conn !== conn);
+                    this.players = this.players.filter(p => p.id !== pId);
+                    this.broadcastRoster();
+                });
+            });
+        });
+    }
+
+    broadcastRoster() {
+        const data = { type: 'roster', players: this.players };
+        for (const c of this.connections) c.conn.send(data);
+        this.updateRoster(this.players);
+        this.game.showRoomState({ code: this.code, players: this.players, isHost: true });
     }
 
     async join(code, name, character = 'soldier') {
-        const data = await this.request('join', { code: code.toUpperCase(), name, character });
-        this.accept(data, false);
-        return data;
-    }
-
-    accept(data, host) {
-        this.active = true;
-        this.host = host;
-        this.code = data.code;
-        this.token = data.token;
-        this.playerId = data.you;
-        this.epoch = data.epoch;
-        this.game.player.setCharacter(data.character || this.game.characterId);
-        this.game.player.cooperative = true;
-        this.game.weapons.onCommand = host ? null : (command) => this.sendCommand(command);
-        this.game.showRoomState(data);
+        return new Promise((resolve, reject) => {
+            code = code.toUpperCase();
+            this.peer = new window.Peer();
+            
+            this.peer.on('open', (id) => {
+                this.conn = this.peer.connect('gungun-room-' + code);
+                
+                this.conn.on('open', () => {
+                    this.conn.send({ type: 'join', name, character });
+                });
+                
+                this.conn.on('data', (data) => {
+                    if (data.type === 'accept') {
+                        this.active = true;
+                        this.host = false;
+                        this.code = code;
+                        this.playerId = data.you;
+                        this.epoch = data.epoch;
+                        
+                        this.game.player.setCharacter(character);
+                        this.game.player.cooperative = true;
+                        this.game.weapons.onCommand = (cmd) => this.sendCommand(cmd);
+                        
+                        this.updateRoster(data.players || []);
+                        this.game.showRoomState({ code, players: data.players, isHost: false });
+                        resolve(data);
+                    } else if (data.type === 'roster') {
+                        this.updateRoster(data.players || []);
+                        this.game.showRoomState({ code: this.code, players: data.players, isHost: false });
+                    } else if (data.type === 'start') {
+                        this.epoch = data.epoch;
+                        this.game.startGame(true);
+                    } else if (data.type === 'snapshot') {
+                        if (data.started && data.epoch !== this.epoch) {
+                            this.epoch = data.epoch;
+                            this.game.startGame(true);
+                        }
+                        this.applyInputs(data.inputs || {});
+                        this.game.applyCoopSnapshot(data.snapshot, this.playerId);
+                        if (data.ack) {
+                            this.pendingCommands = this.pendingCommands.filter(c => c.seq > data.ack);
+                        }
+                    }
+                });
+                
+                this.conn.on('close', () => {
+                    this.active = false;
+                    this.game.showRoomError('Mất kết nối với Host.');
+                });
+                
+                this.conn.on('error', (err) => reject(new Error("Lỗi kết nối: " + err.message)));
+            });
+            this.peer.on('error', (err) => reject(new Error("Lỗi mạng PeerJS: " + err.message)));
+        });
     }
 
     async start() {
-        const data = await this.request('start', this.auth());
-        this.epoch = data.epoch;
+        if (!this.host) return;
+        this.epoch = Date.now();
         this.game.startGame(true);
-        this.game.showRoomState(data);
+        this.game.showRoomState({ code: this.code, players: this.players, isHost: true });
+        const data = { type: 'start', epoch: this.epoch };
+        for (const c of this.connections) c.conn.send(data);
     }
-
-    auth() { return { code: this.code, token: this.token, epoch: this.epoch }; }
 
     sendCommand(command) {
         if (!this.active || this.host) return;
@@ -84,43 +157,35 @@ export class NetworkRoom {
     }
 
     update(delta) {
-        if (!this.active || this.syncing) return;
+        if (!this.active) return;
         this.pollTimer -= delta;
         if (this.pollTimer > 0) return;
-        // Increase polling rate to 30Hz (~33ms) for near-instant FPS feel.
-        // It's safe because `syncing` flag prevents overlapping requests.
-        this.pollTimer = this.game.state === 'MENU' ? 0.5 : 0.033;
-        this.syncing = true;
-        this.sync().catch(error => { this.error = error.message; this.game.showRoomError(this.error); })
-            .finally(() => { this.syncing = false; });
-    }
-
-    async sync() {
-        const local = this.game.player;
-        const body = {
-            ...this.auth(),
-            character: local.characterId,
-            input: { position: local.position.toArray(), aim: local.aimYaw, revive: !!local.reviveRequested,
-                moving: local.velocity.lengthSq() > 0.1 },
-            ack: this.ack
-        };
-        local.reviveRequested = false;
-        if (this.host) body.snapshot = this.game.makeCoopSnapshot();
-        else body.commands = this.pendingCommands.slice(0, 30);
-        const data = await this.request('sync', body);
-        if (body.commands?.length) this.pendingCommands = this.pendingCommands.filter(c => c.seq > body.commands.at(-1).seq);
-        this.updateRoster(data.players || []);
-        this.game.showRoomState(data);
+        
+        // Polling rate of 33ms (30fps) for syncing
+        this.pollTimer = 0.033;
+        
         if (this.host) {
-            this.applyInputs(data.inputs || {});
-            this.ack = data.commands?.at(-1)?.id || this.ack;
-            this.applyCommands(data.commands || []);
-        } else if (data.started && data.epoch !== this.epoch) {
-            this.epoch = data.epoch;
-            this.game.startGame(true);
-            if (data.snapshot) this.game.applyCoopSnapshot(data.snapshot, this.playerId);
-        } else if (data.snapshot) {
-            this.game.applyCoopSnapshot(data.snapshot, this.playerId);
+            const inputs = {};
+            for (const c of this.connections) {
+                if (c.input && c.input.position) inputs[c.id] = c.input;
+            }
+            this.applyInputs(inputs);
+            
+            const snapshot = this.game.makeCoopSnapshot();
+            const started = this.game.state === 'PLAYING';
+            for (const c of this.connections) {
+                c.conn.send({ type: 'snapshot', inputs, snapshot, started, epoch: this.epoch, ack: c.ack });
+            }
+        } else {
+            if (!this.conn || !this.conn.open) return;
+            const local = this.game.player;
+            const body = {
+                type: 'sync',
+                input: { position: local.position.toArray(), aim: local.aimYaw, revive: !!local.reviveRequested, moving: local.velocity.lengthSq() > 0.1 },
+                commands: this.pendingCommands.slice(0, 30)
+            };
+            local.reviveRequested = false;
+            this.conn.send(body);
         }
     }
 
@@ -136,13 +201,17 @@ export class NetworkRoom {
         }
     }
 
-    applyCommands(commands) {
-        for (const item of commands) {
+    applyCommands(commandsList) {
+        for (const item of commandsList) {
             const player = this.game.getCoopPlayer(item.player);
-            const command = item.command || {};
-            if (!player || player.isDead || !player.weapons || item.id <= (player.lastCommandId || 0)) continue;
-            player.lastCommandId = item.id;
-            (player.commandQueue ||= []).push(command);
+            if (!player) continue;
+            const connState = this.connections.find(c => c.id === item.player);
+            for (const command of item.commands) {
+                if (player.isDead || !player.weapons || command.seq <= (player.lastCommandId || 0)) continue;
+                player.lastCommandId = command.seq;
+                if (connState) connState.ack = command.seq;
+                (player.commandQueue ||= []).push(command);
+            }
         }
     }
 
@@ -174,8 +243,9 @@ export class NetworkRoom {
 
     leave() {
         if (!this.active) return;
-        fetch('/api/rooms/leave', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(this.auth()) }).catch(() => {});
         this.active = false;
+        if (this.conn) this.conn.close();
+        if (this.peer) this.peer.destroy();
     }
 }
 

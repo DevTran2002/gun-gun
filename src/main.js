@@ -654,5 +654,12 @@ class CyberArenaGame {
 
 // Instantiate game on page load
 window.addEventListener('DOMContentLoaded', () => {
-    window.game = new CyberArenaGame();
+    const game = new CyberArenaGame();
+    window.game = game;
+    
+    const params = new URLSearchParams(window.location.search);
+    const roomCode = params.get('room');
+    if (roomCode && game.roomCode) {
+        game.roomCode.value = roomCode.toUpperCase();
+    }
 });

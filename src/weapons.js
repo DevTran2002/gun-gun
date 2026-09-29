@@ -270,12 +270,24 @@ export class WeaponSystem {
             const mesh = base.clone(true);
             mesh.traverse(child => {
                 if (!child.isMesh) return;
-                child.material = child.material.clone();
+                if (Array.isArray(child.material)) {
+                    child.material = child.material.map(m => m.clone());
+                } else if (child.material) {
+                    child.material = child.material.clone();
+                }
+                
                 if (w.tier) {
-                    child.material.color.setHex(w.color);
-                    if (child.material.emissive) {
-                        child.material.emissive.setHex(w.color);
-                        child.material.emissiveIntensity = 0.35;
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => {
+                            m.color.setHex(w.color);
+                            if (m.emissive) { m.emissive.setHex(w.color); m.emissiveIntensity = 0.35; }
+                        });
+                    } else {
+                        child.material.color.setHex(w.color);
+                        if (child.material.emissive) {
+                            child.material.emissive.setHex(w.color);
+                            child.material.emissiveIntensity = 0.35;
+                        }
                     }
                 }
             });
@@ -346,6 +358,7 @@ export class WeaponSystem {
             direction.normalize();
             this.fireCooldown = w.fireRate;
             sounds.play('enemyAttack', { volume: 0.45, rate: 1.45 });
+            this.particles.createKnifeSlash(origin, direction, w.color);
             this.projectiles.push({
                 mesh: null,
                 origin: origin.clone(),
