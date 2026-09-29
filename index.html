@@ -55,6 +55,9 @@
             </div>
         </div>
 
+        <!-- Team Roster Status (Danh sách đồng đội & trạng thái) -->
+        <div id="team-roster" class="team-roster-panel" style="display: none;"></div>
+
         <!-- Top Center: Phase & Zombies Remaining -->
         <div class="hud-top-center">
             <div class="wave-card">
@@ -135,6 +138,9 @@
                 <div id="upgrade-stats" class="upgrade-stats">DAME ×1.0 · TỐC BẮN ×1.00 · 1 TIA</div>
             </div>
         </div>
+
+        <!-- Off-Screen Teammate Indicators Overlay (Biểu tượng định vị đồng đội ngoài màn hình) -->
+        <div id="teammate-indicators" class="teammate-indicators-container"></div>
     </div>
 
     <!-- Screen 1: Loading Screen -->
@@ -192,6 +198,7 @@
                     <div class="guide-item"><span class="key-badge">WASD</span><span>Di chuyển theo màn hình</span></div>
                     <div class="guide-item"><span class="key-badge">SPACE</span><span>Nhảy cao</span></div>
                     <div class="guide-item"><span class="key-badge">E</span><span>Nhấn E gần đồng đội bị hạ để hồi sinh</span></div>
+                    <div class="guide-item"><span class="key-badge">B</span><span>Bật/Tắt đồng đội tập luyện (Bot)</span></div>
                     <div class="guide-item"><span class="key-badge">Q</span><span>Luot ne don</span></div>
                 </div>
                 <div class="guide-col">
@@ -217,6 +224,7 @@
             <div class="menu-buttons">
                 <button id="btn-resume" class="btn-action">TIEP TUC</button>
                 <button id="btn-restart-pause" class="btn-action secondary">CHOI LAI</button>
+                <button id="btn-toggle-bot" class="btn-toggle">ĐỒNG ĐỘI BOT: BẬT (PHÍM B)</button>
                 <div class="toggle-row">
                     <button id="toggle-sound" class="btn-toggle">SOUND: ON</button>
                     <button id="toggle-music" class="btn-toggle">MUSIC: ON</button>

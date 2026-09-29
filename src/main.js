@@ -26,6 +26,7 @@ class CyberArenaGame {
         this.network = new NetworkRoom(this);
         this.remotePlayers = new Map();
         this.remoteProjectiles = new Map();
+        this.practiceBot = null;
 
         this.initThree();
         this.initSubsystems();
@@ -131,6 +132,10 @@ class CyberArenaGame {
         if (this.btnRestartOver) {
             this.btnRestartOver.addEventListener('click', () => this.restartGame());
         }
+        this.btnToggleBot = document.getElementById('btn-toggle-bot');
+        if (this.btnToggleBot) {
+            this.btnToggleBot.addEventListener('click', () => this.togglePracticeBot());
+        }
 
         // Pause Key (ESC)
         window.addEventListener('keydown', (e) => {
@@ -233,6 +238,7 @@ class CyberArenaGame {
         if (this.network.active) return;
         this.state = 'PAUSED';
         this.player.setInputEnabled(false);
+        this.ui.clearTeammateIndicators();
         if (this.screenPause) this.screenPause.style.display = 'flex';
     }
 
@@ -249,6 +255,7 @@ class CyberArenaGame {
     gameOver() {
         this.state = 'GAMEOVER';
         this.player.setInputEnabled(false);
+        this.ui.clearTeammateIndicators();
 
         if (this.score > this.highScore) {
             this.highScore = this.score;
@@ -379,6 +386,78 @@ class CyberArenaGame {
         return this.reviveTeammate(teammate, reviver);
     }
 
+    // Bật hoặc tắt đồng đội bot phục vụ thử nghiệm và chơi đơn
+    togglePracticeBot() {
+        if (this.practiceBot) {
+            this.removeCoopPlayer(this.practiceBot.id);
+            this.practiceBot = null;
+            this.ui.showPickupAlert('ĐÃ HỦY ĐỒNG ĐỘI AI');
+            if (this.btnToggleBot) this.btnToggleBot.textContent = 'ĐỒNG ĐỘI BOT: BẬT (PHÍM B)';
+            return;
+        }
+
+        const botId = 'bot_practice';
+        const bot = this.ensureCoopPlayer(botId, 'Chiến binh AI', 'soldier');
+        bot.isBot = true;
+        bot.botShootCooldown = 0;
+        // Đặt vị trí ban đầu ngoài tầm nhìn màn hình (15m) để quan sát định vị rìa màn hình
+        bot.position.copy(this.player.position).add(new THREE.Vector3(15, 0, 15));
+        this.practiceBot = bot;
+        this.ui.showPickupAlert('ĐÃ GỌI ĐỒNG ĐỘI AI (PHÍM B ĐỂ BẬT/TẮT)');
+        if (this.btnToggleBot) this.btnToggleBot.textContent = 'ĐỒNG ĐỘI BOT: TẮT (PHÍM B)';
+    }
+
+    // Cập nhật hành vi cho đồng đội bot (di chuyển, ngắm bắn quái)
+    updatePracticeBot(delta) {
+        const bot = this.practiceBot;
+        if (!bot || bot.isDead) return;
+
+        if (bot.isDowned) {
+            bot.moving = false;
+            return;
+        }
+
+        bot.botShootCooldown = Math.max(0, (bot.botShootCooldown || 0) - delta);
+
+        // Vector và khoảng cách tới người chơi
+        const toPlayer = this.player.position.clone().sub(bot.position);
+        toPlayer.y = 0;
+        const distToPlayer = toPlayer.length();
+
+        // Di chuyển theo người chơi nếu khoảng cách quá xa (> 26m)
+        if (distToPlayer > 26) {
+            toPlayer.normalize();
+            bot.position.addScaledVector(toPlayer, 5.2 * delta);
+            bot.aimYaw = Math.atan2(toPlayer.x, toPlayer.z);
+            bot.moving = true;
+        } else {
+            bot.moving = false;
+        }
+
+        // Tìm kiếm quái gần nhất để bắn hỗ trợ
+        let nearestEnemy = null;
+        let minDist = 15;
+        for (const enemy of this.waveManager.enemies) {
+            if (enemy.isDead) continue;
+            const d = enemy.position.distanceTo(bot.position);
+            if (d < minDist) {
+                minDist = d;
+                nearestEnemy = enemy;
+            }
+        }
+
+        if (nearestEnemy) {
+            const toEnemy = nearestEnemy.position.clone().sub(bot.position);
+            bot.aimYaw = Math.atan2(toEnemy.x, toEnemy.z);
+            if (bot.botShootCooldown <= 0) {
+                bot.botShootCooldown = 0.85;
+                const shootOrigin = bot.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+                const shootTarget = nearestEnemy.position.clone().add(new THREE.Vector3(0, 0.8, 0));
+                bot.weapons.shoot(shootOrigin, shootTarget, false, true);
+            }
+        }
+    }
+
     makeCoopSnapshot() {
         return { state: this.state, wave: this.currentWave, score: this.score,
             projectiles: this.coopPlayers.flatMap(player => (player.weapons?.projectiles || []).filter(p => p.mesh).map(p => ({ id: `${player.id || this.network.playerId}:${p.id}`, owner: player.id || this.network.playerId, position: p.mesh.position.toArray(), direction: p.direction.toArray(), speed: p.speed, color: p.color }))),
@@ -501,6 +580,13 @@ class CyberArenaGame {
                 this.reviveTeammate(downed, this.player);
                 this.player.reviveRequested = false;
             }
+            if (this.player.toggleBotRequested) {
+                this.togglePracticeBot();
+                this.player.toggleBotRequested = false;
+            }
+            if (this.practiceBot) {
+                this.updatePracticeBot(delta);
+            }
             for (const player of this.remotePlayers.values()) player.updateVisual(delta);
             // Player Damage Flash / Game Over check
             if (this.player.isDead && (!this.network.active || this.coopPlayers.every(player => player.isDead)) && this.state !== 'GAMEOVER') {
@@ -549,9 +635,12 @@ class CyberArenaGame {
             // Update Particles
             this.particles.update(delta);
 
-            // Update UI & Radar with 4 Portals
+            // Update UI & Radar with 4 Portals and Teammate Off-Screen Indicators
+            const teammates = Array.from(this.remotePlayers.values());
             this.ui.updateStats(this.player, this.waveManager, this.score);
-            this.ui.drawRadar(this.player, this.waveManager.enemies, this.pickups.pickups, this.arena.getPortals());
+            this.ui.updateTeammateIndicators(teammates, this.player, this.camera);
+            this.ui.updateTeamRoster(teammates, this.player);
+            this.ui.drawRadar(this.player, this.waveManager.enemies, this.pickups.pickups, this.arena.getPortals(), teammates);
         } else if (this.state === 'MENU' || this.state === 'LOADING') {
             this.player.updateCamera(delta);
             this.particles.update(delta);
@@ -566,6 +655,7 @@ class CyberArenaGame {
 // Instantiate game on page load
 window.addEventListener('DOMContentLoaded', () => {
     const game = new CyberArenaGame();
+    window.game = game;
     
     const params = new URLSearchParams(window.location.search);
     const roomCode = params.get('room');
