@@ -1,0 +1,248 @@
+@import url('https://fonts.googleapis.com/css2?family=Fredoka+One&family=Nunito:wght@700;800;900&display=swap');
+
+:root {
+    --zp-bg-orange: #f28c38;
+    --zp-bg-orange-light: #f6a154;
+    --zp-panel-purple: #7a6396;
+    --zp-panel-purple-dark: #634d7d;
+    --zp-btn-yellow: #fcd541;
+    --zp-btn-yellow-dark: #f0a500;
+    --zp-btn-shadow: #b37300;
+    --zp-btn-blue: #5b9ce6;
+    --zp-btn-blue-dark: #437ab8;
+    --zp-btn-blue-shadow: #2f5a8a;
+    --zp-text-dark: #3a2e47;
+    --font-heading: 'Fredoka One', cursive;
+    --font-body: 'Nunito', sans-serif;
+}
+
+body, html {
+    font-family: var(--font-body);
+}
+
+/* Background Pattern */
+.screen-overlay {
+    background-color: var(--zp-bg-orange) !important;
+    background-image: radial-gradient(var(--zp-bg-orange-light) 20%, transparent 20%),
+                      radial-gradient(var(--zp-bg-orange-light) 20%, transparent 20%) !important;
+    background-size: 60px 60px !important;
+    background-position: 0 0, 30px 30px !important;
+}
+
+/* Modal / Menu Box (Purple) */
+.menu-box {
+    background: var(--zp-panel-purple) !important;
+    border: 4px solid var(--zp-text-dark) !important;
+    border-radius: 20px !important;
+    box-shadow: 0 8px 0 var(--zp-panel-purple-dark), 0 12px 20px rgba(0,0,0,0.4) !important;
+    backdrop-filter: none !important;
+    padding: 30px !important;
+    color: white !important;
+    position: relative;
+    max-width: 650px !important;
+}
+
+/* Titles */
+.game-logo, .menu-heading {
+    font-family: var(--font-heading) !important;
+    color: white !important;
+    text-transform: uppercase;
+    font-size: 3.5rem !important;
+    -webkit-text-stroke: 2.5px var(--zp-text-dark);
+    text-shadow: 0 4px 0 var(--zp-text-dark), 0 6px 10px rgba(0,0,0,0.3) !important;
+    letter-spacing: 2px !important;
+    margin-bottom: 10px !important;
+}
+
+.game-sublogo {
+    font-family: var(--font-body) !important;
+    color: #ffd040 !important;
+    font-weight: 900 !important;
+    font-size: 1.1rem !important;
+    text-transform: uppercase;
+    -webkit-text-stroke: 1px var(--zp-text-dark);
+}
+
+/* Play Button */
+.btn-action.pulse, #btn-start, #btn-restart-gameover {
+    font-family: var(--font-heading) !important;
+    background: linear-gradient(to bottom, var(--zp-btn-yellow), var(--zp-btn-yellow-dark)) !important;
+    border: 3px solid var(--zp-text-dark) !important;
+    border-radius: 16px !important;
+    color: white !important;
+    font-size: 2.2rem !important;
+    padding: 15px 40px !important;
+    -webkit-text-stroke: 2px var(--zp-text-dark);
+    text-shadow: 0 3px 0 var(--zp-text-dark) !important;
+    box-shadow: 0 6px 0 var(--zp-btn-shadow), 0 8px 10px rgba(0,0,0,0.2) !important;
+    transition: transform 0.1s, box-shadow 0.1s !important;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.btn-action.pulse:active, #btn-start:active, #btn-restart-gameover:active {
+    transform: translateY(6px) !important;
+    box-shadow: 0 0px 0 var(--zp-btn-shadow) !important;
+}
+
+/* Secondary Buttons */
+.btn-action, .btn-toggle {
+    font-family: var(--font-heading) !important;
+    background: linear-gradient(to bottom, var(--zp-btn-blue), var(--zp-btn-blue-dark)) !important;
+    border: 3px solid var(--zp-text-dark) !important;
+    border-radius: 12px !important;
+    color: white !important;
+    font-size: 1.1rem !important;
+    padding: 10px 20px !important;
+    -webkit-text-stroke: 1px var(--zp-text-dark);
+    text-shadow: 0 2px 0 var(--zp-text-dark) !important;
+    box-shadow: 0 4px 0 var(--zp-btn-blue-shadow) !important;
+    transition: transform 0.1s, box-shadow 0.1s !important;
+    font-weight: normal !important;
+}
+
+.btn-action:active, .btn-toggle:active {
+    transform: translateY(4px) !important;
+    box-shadow: 0 0px 0 var(--zp-btn-blue-shadow) !important;
+}
+
+/* Inputs */
+input {
+    background: #4a3a5c !important;
+    border: 3px solid var(--zp-text-dark) !important;
+    border-radius: 12px !important;
+    color: white !important;
+    font-family: var(--font-heading) !important;
+    padding: 12px !important;
+    box-shadow: inset 0 4px 8px rgba(0,0,0,0.3) !important;
+    text-align: center;
+    font-size: 1.2rem !important;
+    -webkit-text-stroke: 1px var(--zp-text-dark);
+}
+
+input::placeholder {
+    color: #9480ab !important;
+    -webkit-text-stroke: 0px;
+}
+
+/* Room Panel Restyling */
+.room-panel {
+    background: rgba(0,0,0,0.15) !important;
+    border: 3px dashed rgba(255,255,255,0.2) !important;
+    border-radius: 16px !important;
+    padding: 20px !important;
+    margin: 20px 0 !important;
+    box-shadow: none !important;
+}
+
+.room-title {
+    font-family: var(--font-heading) !important;
+    color: white !important;
+    -webkit-text-stroke: 1.5px var(--zp-text-dark);
+    text-shadow: 0 2px 0 var(--zp-text-dark) !important;
+    font-size: 1.4rem !important;
+}
+
+/* Character Options */
+.character-options {
+    gap: 15px !important;
+    margin-bottom: 20px !important;
+}
+.character-option {
+    background: #4a3a5c !important;
+    border: 3px solid var(--zp-text-dark) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 4px 0 var(--zp-text-dark) !important;
+}
+.character-option.selected {
+    background: var(--zp-btn-yellow) !important;
+    border-color: var(--zp-text-dark) !important;
+    box-shadow: 0 4px 0 var(--zp-btn-shadow) !important;
+}
+.character-option.selected span {
+    color: white !important;
+    font-family: var(--font-heading);
+    -webkit-text-stroke: 1px var(--zp-text-dark);
+}
+
+/* HUD Override */
+.hud-panel {
+    background: var(--zp-panel-purple) !important;
+    border: 4px solid var(--zp-text-dark) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 6px 0 var(--zp-panel-purple-dark), 0 8px 15px rgba(0,0,0,0.3) !important;
+    padding: 10px !important;
+}
+
+.label-tag, .score-label, .wave-sub, .wave-title, .radar-title, .boss-label {
+    font-family: var(--font-heading) !important;
+    -webkit-text-stroke: 1.5px var(--zp-text-dark) !important;
+    text-shadow: 0 2px 0 var(--zp-text-dark) !important;
+    color: white !important;
+    font-size: 1.1rem !important;
+}
+
+/* Bottom HUD */
+.th_cluster_survival, .th_cluster_active_weapon, .th_cluster_hotbar {
+    background: var(--zp-panel-purple) !important;
+    border: 4px solid var(--zp-text-dark) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 6px 0 var(--zp-panel-purple-dark) !important;
+}
+
+.th_health_track {
+    background: #4a3a5c !important;
+    border: 3px solid var(--zp-text-dark) !important;
+    border-radius: 12px !important;
+}
+
+.th_health_bar_fill {
+    background: linear-gradient(to bottom, #ff6b6b, #e60000) !important;
+}
+
+.th_active_slot_box, .th_hotbar_slot {
+    background: #4a3a5c !important;
+    border: 3px solid var(--zp-text-dark) !important;
+    border-radius: 12px !important;
+    box-shadow: inset 0 4px 8px rgba(0,0,0,0.3) !important;
+}
+
+.th_hotbar_slot.active, .th_active_slot_box {
+    background: var(--zp-btn-yellow) !important;
+    border-color: var(--zp-text-dark) !important;
+    box-shadow: 0 4px 0 var(--zp-btn-shadow) !important;
+    transform: translateY(-5px);
+}
+
+.th_keybind_badge {
+    background: var(--zp-text-dark) !important;
+    color: white !important;
+    font-family: var(--font-heading) !important;
+    border-radius: 50% !important;
+    padding: 2px 6px !important;
+    font-size: 14px !important;
+}
+
+.th_ammo_cur_big {
+    font-family: var(--font-heading) !important;
+    color: white !important;
+    -webkit-text-stroke: 2px var(--zp-text-dark) !important;
+    text-shadow: 0 3px 0 var(--zp-text-dark) !important;
+}
+
+.mutation-guide, .controls-guide, .loot-guide {
+    background: rgba(0,0,0,0.2) !important;
+    border-radius: 12px !important;
+    padding: 15px !important;
+    border: 2px dashed rgba(255,255,255,0.3) !important;
+}
+
+.key-badge {
+    background: var(--zp-btn-blue) !important;
+    border: 2px solid var(--zp-text-dark) !important;
+    box-shadow: 0 3px 0 var(--zp-btn-blue-shadow) !important;
+    font-family: var(--font-heading) !important;
+    border-radius: 6px !important;
+    color: white !important;
+    padding: 4px 8px !important;
+}
