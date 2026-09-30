@@ -1542,8 +1542,12 @@ export class UIManager {
         el.id = `${side}-slot-${index}`;
         el.draggable = true;
 
+        const iconHtml = itemDef?.iconImage
+            ? `<div class="slot-item-thumb"><img src="${itemDef.iconImage}" class="slot-item-img" alt="${itemDef.name}"></div>`
+            : `<span class="slot-item-icon" style="color: ${itemDef?.color || '#fff'};">${itemDef?.icon || 'ITM'}</span>`;
+
         el.innerHTML = `
-            <span class="slot-item-icon" style="color: ${itemDef?.color || '#fff'};">${itemDef?.icon || 'ITM'}</span>
+            ${iconHtml}
             <span class="slot-item-name">${itemDef?.name || slot.itemId}</span>
             ${slot.count > 1 ? `<span class="slot-item-count">×${slot.count}</span>` : ''}
         `;

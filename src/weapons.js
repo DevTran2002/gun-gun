@@ -92,9 +92,9 @@ export const WEAPON_CONFIGS = [
 ];
 
 export const RARE_WEAPON_CONFIGS = [
-    { ...WEAPON_CONFIGS[0], id: 'plasma', name: 'PLASMA LANCE', damage: 54, penPower: 3, fireRate: 0.15, magSize: 24, baseSpreadDegHip: 1.8, baseSpreadDegADS: 0.4, screenShake: 0.22, cursorKick: 3.8, color: 0x9966ff, isAuto: true, tier: 1 },
-    { ...WEAPON_CONFIGS[1], id: 'storm', name: 'STORM MK-II', damage: 25, penPower: 2, fireRate: 0.065, magSize: 48, baseSpreadDegHip: 2.8, baseSpreadDegADS: 0.7, screenShake: 0.14, cursorKick: 2.4, color: 0x55ffcc, tier: 1 },
-    { ...WEAPON_CONFIGS[2], id: 'nova', name: 'NOVA SHOTGUN', damage: 22, penPower: 3, pellets: 8, fireRate: 0.45, magSize: 12, baseSpreadDegHip: 7.5, baseSpreadDegADS: 3.5, screenShake: 0.45, cursorKick: 8.0, color: 0xff6633, tier: 1 }
+    { ...WEAPON_CONFIGS[0], id: 'plasma', name: 'PLASMA LANCE', modelFile: 'kenney-blaster/blaster-j.glb', icon: 'assets/previews/kenney-blaster/blaster-j.png', damage: 54, penPower: 3, fireRate: 0.15, magSize: 24, baseSpreadDegHip: 1.8, baseSpreadDegADS: 0.4, screenShake: 0.22, cursorKick: 3.8, color: 0x9966ff, isAuto: true, tier: 1 },
+    { ...WEAPON_CONFIGS[1], id: 'storm', name: 'STORM MK-II', modelFile: 'kenney-blaster/blaster-e.glb', icon: 'assets/previews/kenney-blaster/blaster-e.png', damage: 25, penPower: 2, fireRate: 0.065, magSize: 48, baseSpreadDegHip: 2.8, baseSpreadDegADS: 0.7, screenShake: 0.14, cursorKick: 2.4, color: 0x55ffcc, tier: 1 },
+    { ...WEAPON_CONFIGS[2], id: 'nova', name: 'NOVA SHOTGUN', modelFile: 'kenney-blaster/blaster-g.glb', icon: 'assets/previews/kenney-blaster/blaster-g.png', damage: 22, penPower: 3, pellets: 8, fireRate: 0.45, magSize: 12, baseSpreadDegHip: 7.5, baseSpreadDegADS: 3.5, screenShake: 0.45, cursorKick: 8.0, color: 0xff6633, tier: 1 }
 ];
 
 export const KNIFE_CONFIG = {
@@ -258,7 +258,11 @@ export class WeaponSystem {
             }, undefined, () => resolve());
         });
 
-        await Promise.all([...new Set(WEAPON_CONFIGS.map(w => w.modelFile))].map(loadModel));
+        const allModels = [
+            ...WEAPON_CONFIGS.map(w => w.modelFile),
+            ...RARE_WEAPON_CONFIGS.map(w => w.modelFile)
+        ].filter(Boolean);
+        await Promise.all([...new Set(allModels)].map(loadModel));
 
         this.resetRun();
     }

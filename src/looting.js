@@ -1,5 +1,26 @@
 import * as THREE from 'three';
+import { GLTFLoader } from '../libs/loaders/GLTFLoader.js';
 import { sounds } from './audio.js';
+
+const _gltfLoader = new GLTFLoader();
+const _modelCache = new Map();
+
+function getOrLoadModel(path, onLoad) {
+    if (_modelCache.has(path)) {
+        onLoad(_modelCache.get(path).clone());
+        return;
+    }
+    _gltfLoader.load(path, (gltf) => {
+        gltf.scene.traverse(c => {
+            if (c.isMesh) {
+                c.castShadow = true;
+                c.receiveShadow = true;
+            }
+        });
+        _modelCache.set(path, gltf.scene);
+        onLoad(gltf.scene.clone());
+    }, undefined, () => {});
+}
 
 // Danh mục vật phẩm chuẩn Hardcore Extraction Shooter
 export const LOOT_ITEMS = {
@@ -11,6 +32,7 @@ export const LOOT_ITEMS = {
         rarity: 'epic',
         color: '#b026ff',
         icon: 'AK',
+        iconImage: 'assets/previews/kenney-blaster/blaster-d.png',
         description: 'Vũ khí tự động quân dụng 7.62mm, uy lực cao, độ giật đầm, tàn phá mục tiêu bọc giáp.',
         value: 1200,
         stackMax: 1,
@@ -23,6 +45,7 @@ export const LOOT_ITEMS = {
         rarity: 'legendary',
         color: '#ffaa00',
         icon: 'SR',
+        iconImage: 'assets/previews/kenney-blaster/blaster-j.png',
         description: 'Súng bắn tỉa hạng nặng công phá cao, đạn xuyên thấu mọi lớp vỏ bảo hộ của zombie khổng lồ.',
         value: 2500,
         stackMax: 1,
@@ -35,8 +58,22 @@ export const LOOT_ITEMS = {
         rarity: 'rare',
         color: '#00d0ff',
         icon: 'SG',
+        iconImage: 'assets/previews/kenney-blaster/blaster-g.png',
         description: 'Shotgun tác chiến cự ly gần với chùm đạn đa tia diện rộng, đẩy lùi đàn zombie hung hãn.',
         value: 800,
+        stackMax: 1,
+        weaponSlotId: 0
+    },
+    weapon_titan: {
+        id: 'weapon_titan',
+        name: 'Đại Bác Phản Lực TITAN-N',
+        category: 'weapon',
+        rarity: 'legendary',
+        color: '#ff3366',
+        icon: 'TITAN',
+        iconImage: 'assets/previews/kenney-blaster/blaster-n.png',
+        description: 'Khẩu đại pháo 4 họng xả cực mạnh từ kho khí tài Airdrop, phát bắn nổ chấn động xóa sổ mọi mục tiêu.',
+        value: 3500,
         stackMax: 1,
         weaponSlotId: 0
     },
@@ -49,6 +86,7 @@ export const LOOT_ITEMS = {
         rarity: 'epic',
         color: '#b026ff',
         icon: 'AP',
+        iconImage: 'assets/previews/kenney-blaster/clip-large.png',
         description: 'Đạn lõi vonfram mật độ cao, tăng 100% xuyên thấu giáp và xé rách mô cứng đột biến.',
         value: 650,
         stackMax: 3,
@@ -61,6 +99,7 @@ export const LOOT_ITEMS = {
         rarity: 'common',
         color: '#94a3b8',
         icon: 'STD',
+        iconImage: 'assets/previews/kenney-blaster/clip-small.png',
         description: 'Băng đạn tiêu chuẩn nạp đầy 4 băng đạn dự trữ cho mọi loại súng tác chiến.',
         value: 200,
         stackMax: 5,
@@ -73,13 +112,42 @@ export const LOOT_ITEMS = {
         rarity: 'rare',
         color: '#00d0ff',
         icon: 'HP',
+        iconImage: 'assets/previews/kenney-blaster/bullet-foam-tip.png',
         description: 'Đạn nở khi va chạm, tăng 40% sát thương chí mạng crit lên quái không mặc giáp.',
         value: 450,
         stackMax: 3,
         effect: { type: 'crit_boost', duration: 30, value: 0.4 }
     },
 
-    // 3. Giáp bảo hộ & Phòng vệ (Armor & Defense)
+    // 3. Vật phẩm ném & Chiến thuật (Grenades & Tactical)
+    grenade_explosive: {
+        id: 'grenade_explosive',
+        name: 'Lựu Đạn Nổ Phá GRENADE-A',
+        category: 'grenade',
+        rarity: 'rare',
+        color: '#ef4444',
+        icon: 'NADE',
+        iconImage: 'assets/previews/kenney-blaster/grenade-a.png',
+        description: 'Lựu đạn nổ dã chiến: Chuột phải để ném kích nổ tức thì 260 sát thương trong bán kính 6.5m.',
+        value: 600,
+        stackMax: 3,
+        effect: { type: 'explosive_grenade', damage: 260, radius: 6.5 }
+    },
+    grenade_smoke: {
+        id: 'grenade_smoke',
+        name: 'Lựu Đạn Khói Chiến Thuật SMOKE-B',
+        category: 'grenade',
+        rarity: 'rare',
+        color: '#00f0ff',
+        icon: 'SMK',
+        iconImage: 'assets/previews/kenney-blaster/smoke.png',
+        description: 'Tạo màn khói chiến thuật dày đặc trong 10 giây, làm chậm 60% tốc độ di chuyển của bầy zombie.',
+        value: 500,
+        stackMax: 3,
+        effect: { type: 'smoke_grenade', duration: 10, slow: 0.6 }
+    },
+
+    // 4. Giáp bảo hộ & Phòng vệ (Armor & Defense)
     armor_vest_lvl4: {
         id: 'armor_vest_lvl4',
         name: 'Áo Giáp Chống Đạn Kevlar Cấp 4',
@@ -195,6 +263,8 @@ export const CONTAINER_CONFIGS = {
         lootTable: [
             { itemId: 'ammo_standard', chance: 0.85, min: 1, max: 2 },
             { itemId: 'ammo_hollow', chance: 0.35, min: 1, max: 1 },
+            { itemId: 'grenade_explosive', chance: 0.30, min: 1, max: 1 },
+            { itemId: 'grenade_smoke', chance: 0.25, min: 1, max: 1 },
             { itemId: 'medkit_military', chance: 0.45, min: 1, max: 1 },
             { itemId: 'painkiller_morphine', chance: 0.40, min: 1, max: 1 },
             { itemId: 'armor_vest_lvl4', chance: 0.20, min: 1, max: 1 },
@@ -211,11 +281,13 @@ export const CONTAINER_CONFIGS = {
         promptLabel: '[F] MỞ KHÓA KÉT SẮT',
         lootTable: [
             { itemId: 'ammo_ap', chance: 0.75, min: 1, max: 2 },
+            { itemId: 'grenade_explosive', chance: 0.45, min: 1, max: 2 },
             { itemId: 'armor_vest_lvl6', chance: 0.35, min: 1, max: 1 },
             { itemId: 'gold_bar', chance: 0.50, min: 1, max: 2 },
             { itemId: 'military_flashdrive', chance: 0.60, min: 1, max: 1 },
             { itemId: 'classified_intel', chance: 0.45, min: 1, max: 1 },
-            { itemId: 'weapon_assault', chance: 0.40, min: 1, max: 1 }
+            { itemId: 'weapon_assault', chance: 0.40, min: 1, max: 1 },
+            { itemId: 'weapon_titan', chance: 0.25, min: 1, max: 1 }
         ]
     },
     dead_body: {
@@ -228,6 +300,8 @@ export const CONTAINER_CONFIGS = {
         promptLabel: '[F] KHÁM XÁC CHIẾN BINH',
         lootTable: [
             { itemId: 'ammo_standard', chance: 0.70, min: 1, max: 2 },
+            { itemId: 'grenade_explosive', chance: 0.35, min: 1, max: 1 },
+            { itemId: 'grenade_smoke', chance: 0.35, min: 1, max: 1 },
             { itemId: 'medkit_military', chance: 0.50, min: 1, max: 1 },
             { itemId: 'stimpack_adrenaline', chance: 0.35, min: 1, max: 1 },
             { itemId: 'painkiller_morphine', chance: 0.45, min: 1, max: 1 },
@@ -245,9 +319,11 @@ export const CONTAINER_CONFIGS = {
         accentColor: 0x06b6d4,
         promptLabel: '[F] MỞ HÒM THÍNH (4.5s)',
         lootTable: [
+            { itemId: 'weapon_titan', chance: 0.60, min: 1, max: 1 },
             { itemId: 'weapon_sniper', chance: 0.65, min: 1, max: 1 },
             { itemId: 'weapon_assault', chance: 0.75, min: 1, max: 1 },
             { itemId: 'armor_vest_lvl6', chance: 0.80, min: 1, max: 1 },
+            { itemId: 'grenade_explosive', chance: 0.70, min: 1, max: 2 },
             { itemId: 'ammo_ap', chance: 0.90, min: 2, max: 3 },
             { itemId: 'stimpack_adrenaline', chance: 0.85, min: 1, max: 2 },
             { itemId: 'medkit_military', chance: 0.95, min: 2, max: 3 },
@@ -348,45 +424,37 @@ export class LootContainer {
         group.position.copy(this.position);
 
         if (this.type === 'wooden_crate') {
-            // Hòm gỗ có đai sắt bọc góc
-            const boxGeo = new THREE.BoxGeometry(1.2, 0.75, 0.9);
-            const boxMat = new THREE.MeshStandardMaterial({
-                color: this.config.meshColor,
-                roughness: 0.85,
-                metalness: 0.1
+            // Hòm gỗ quân sự dã chiến: Tải mô hình 3D crate-medium chuẩn Kenney
+            const fallbackGeo = new THREE.BoxGeometry(1.2, 0.75, 0.9);
+            const fallbackMat = new THREE.MeshStandardMaterial({ color: this.config.meshColor, roughness: 0.85 });
+            const fallbackCrate = new THREE.Mesh(fallbackGeo, fallbackMat);
+            fallbackCrate.position.y = 0.38;
+            group.add(fallbackCrate);
+
+            getOrLoadModel('assets/models/kenney-blaster/crate-medium.glb', (model) => {
+                model.scale.set(1.6, 1.6, 1.6);
+                model.position.set(0, 0, 0);
+                group.remove(fallbackCrate);
+                fallbackGeo.dispose();
+                fallbackMat.dispose();
+                group.add(model);
             });
-            const crate = new THREE.Mesh(boxGeo, boxMat);
-            crate.castShadow = true;
-            crate.receiveShadow = true;
-            crate.position.y = 0.38;
-
-            const bandGeo = new THREE.BoxGeometry(1.22, 0.12, 0.92);
-            const bandMat = new THREE.MeshStandardMaterial({ color: 0x222222, metalness: 0.7, roughness: 0.4 });
-            const band1 = new THREE.Mesh(bandGeo, bandMat);
-            band1.position.y = 0.22;
-            const band2 = new THREE.Mesh(bandGeo, bandMat);
-            band2.position.y = 0.54;
-
-            group.add(crate, band1, band2);
         } else if (this.type === 'military_safe') {
-            // Két sắt quân sự bằng kim loại đen bóng viền xanh
-            const safeGeo = new THREE.BoxGeometry(0.9, 1.1, 0.85);
-            const safeMat = new THREE.MeshStandardMaterial({
-                color: this.config.meshColor,
-                metalness: 0.85,
-                roughness: 0.25
+            // Két sắt quân sự chống đạn: Tải mô hình crate-wide với ánh sáng titan
+            const fallbackGeo = new THREE.BoxGeometry(1.1, 0.9, 0.9);
+            const fallbackMat = new THREE.MeshStandardMaterial({ color: 0x334155, metalness: 0.85, roughness: 0.3 });
+            const fallbackSafe = new THREE.Mesh(fallbackGeo, fallbackMat);
+            fallbackSafe.position.y = 0.45;
+            group.add(fallbackSafe);
+
+            getOrLoadModel('assets/models/kenney-blaster/crate-wide.glb', (model) => {
+                model.scale.set(1.5, 1.5, 1.5);
+                model.position.set(0, 0, 0);
+                group.remove(fallbackSafe);
+                fallbackGeo.dispose();
+                fallbackMat.dispose();
+                group.add(model);
             });
-            const safe = new THREE.Mesh(safeGeo, safeMat);
-            safe.position.y = 0.55;
-            safe.castShadow = true;
-
-            const dialGeo = new THREE.CylinderGeometry(0.12, 0.12, 0.08, 16);
-            const dialMat = new THREE.MeshStandardMaterial({ color: 0x00f0ff, emissive: 0x005577, metalness: 0.9 });
-            const dial = new THREE.Mesh(dialGeo, dialMat);
-            dial.rotation.x = Math.PI / 2;
-            dial.position.set(0, 0.65, 0.46);
-
-            group.add(safe, dial);
         } else if (this.type === 'dead_body') {
             // Xác chiến binh tử trận nằm cạnh túi đồ dã chiến
             const bodyGeo = new THREE.CapsuleGeometry(0.3, 1.2, 4, 8);
@@ -404,24 +472,28 @@ export class LootContainer {
 
             group.add(bodyMesh, bagMesh);
         } else if (this.type === 'airdrop_crate') {
-            // Hòm thính Airdrop có màu cam nổi bật và dải phản quang
-            const crateGeo = new THREE.BoxGeometry(1.5, 1.1, 1.5);
-            const crateMat = new THREE.MeshStandardMaterial({
-                color: this.config.meshColor,
-                roughness: 0.65,
-                metalness: 0.3
-            });
-            const crate = new THREE.Mesh(crateGeo, crateMat);
+            // Hòm thính Airdrop: Dùng model crate-wide cỡ lớn kèm đèn tín hiệu
+            const fallbackGeo = new THREE.BoxGeometry(1.5, 1.1, 1.5);
+            const fallbackMat = new THREE.MeshStandardMaterial({ color: 0xd97706, roughness: 0.65 });
+            const crate = new THREE.Mesh(fallbackGeo, fallbackMat);
             crate.position.y = 0.55;
-            crate.castShadow = true;
+            group.add(crate);
+
+            getOrLoadModel('assets/models/kenney-blaster/crate-wide.glb', (model) => {
+                model.scale.set(2.0, 2.0, 2.0);
+                model.position.set(0, 0, 0);
+                group.remove(crate);
+                fallbackGeo.dispose();
+                fallbackMat.dispose();
+                group.add(model);
+            });
 
             // Đèn hải đăng chớp tín hiệu
             const beaconGeo = new THREE.CylinderGeometry(0.08, 0.1, 0.45, 8);
             const beaconMat = new THREE.MeshBasicMaterial({ color: 0xff0044 });
             const beacon = new THREE.Mesh(beaconGeo, beaconMat);
-            beacon.position.set(0, 1.25, 0);
-
-            group.add(crate, beacon);
+            beacon.position.set(0, 1.15, 0);
+            group.add(beacon);
         }
 
         // Vòng sáng tương tác dưới sàn
@@ -505,6 +577,16 @@ export class AirdropDropEntity {
         const boxMesh = new THREE.Mesh(boxGeo, boxMat);
         boxMesh.position.y = 0.6;
         boxMesh.castShadow = true;
+        this.group.add(boxMesh);
+
+        getOrLoadModel('assets/models/kenney-blaster/crate-wide.glb', (model) => {
+            model.scale.set(2.0, 2.0, 2.0);
+            model.position.set(0, 0, 0);
+            this.group.remove(boxMesh);
+            boxGeo.dispose();
+            boxMat.dispose();
+            this.group.add(model);
+        });
 
         // 2. Dù lượn đơn giản (Parachute dome)
         const chuteGeo = new THREE.SphereGeometry(2.4, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.48);
@@ -921,6 +1003,41 @@ export class LootingSystem {
             if (typeof window.game !== 'undefined') {
                 window.game.score += effect.points;
             }
+            used = true;
+        } else if (effect.type === 'explosive_grenade') {
+            // Ném lựu đạn nổ phá: Kích nổ tại vị trí ngắm hoặc trước mặt người chơi
+            const targetPos = this.player.aimPoint ? this.player.aimPoint.clone() : this.player.position.clone();
+            targetPos.y = 0.5;
+            const radius = effect.radius || 6.5;
+            const dmg = effect.damage || 260;
+
+            // Gây sát thương diện rộng cho toàn bộ zombie trong bán kính nổ
+            if (this.waveManager?.enemies) {
+                for (const enemy of this.waveManager.enemies) {
+                    if (enemy.isDead) continue;
+                    const d = enemy.position.distanceTo(targetPos);
+                    if (d <= radius) {
+                        const falloff = 1 - (d / radius) * 0.45;
+                        enemy.takeDamage(dmg * falloff, this.player.position);
+                    }
+                }
+            }
+            // Rung màn hình và tạo chấn động
+            this.player.applyKickbackAndShake?.(4.0, 0.45);
+            sounds.playExplosion?.();
+            used = true;
+        } else if (effect.type === 'smoke_grenade') {
+            // Ném lựu đạn khói: Làm chậm và che mắt quái vật trong 10 giây
+            const targetPos = this.player.aimPoint ? this.player.aimPoint.clone() : this.player.position.clone();
+            if (this.waveManager?.enemies) {
+                for (const enemy of this.waveManager.enemies) {
+                    if (enemy.isDead) continue;
+                    if (enemy.position.distanceTo(targetPos) <= 9.0) {
+                        if (enemy.speed) enemy.speed *= (1 - effect.slow);
+                    }
+                }
+            }
+            sounds.play('land', { volume: 0.8, rate: 0.8 });
             used = true;
         }
 

@@ -87,3 +87,6 @@
 .item-inspect-panel { background:rgba(18,14,26,0.7); border:1.5px solid #3c2f4d; border-radius:10px; padding:10px 14px; min-height:52px; }
 .inspect-title { font-size:12px; font-weight:1000; color:#ffdf8a; margin-bottom:3px; }
 .inspect-desc { font-size:10px; font-weight:700; color:#cfc2df; line-height:1.35; }
+.slot-item-thumb { width:34px; height:34px; display:flex; align-items:center; justify-content:center; }
+.slot-item-img { max-width:100%; max-height:100%; object-fit:contain; filter:drop-shadow(0 2px 4px rgba(0,0,0,0.5)); transition:transform .15s ease; }
+.inv-slot:hover .slot-item-img { transform:scale(1.12); }
