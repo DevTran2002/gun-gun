@@ -421,34 +421,18 @@ export class Zombie {
             _tempDesiredDir.copy(_tempToPlayer);
             if (canSpit && dist < 9) _tempDesiredDir.negate();
             
-            // AI: Obstacle avoidance check
-            const feelerDist = this.radius * 2.5;
-            _tempNextPos.copy(this.position).addScaledVector(_tempDesiredDir, feelerDist);
-            if (arena.checkCollision(_tempNextPos, this.radius)) {
-                // Try left and right feelers to slide around obstacle
-                _tempLeftDir.copy(_tempDesiredDir).applyAxisAngle(_upAxis, Math.PI / 3);
-                _tempRightDir.copy(_tempDesiredDir).applyAxisAngle(_upAxis, -Math.PI / 3);
-                
-                _tempNextPos.copy(this.position).addScaledVector(_tempLeftDir, feelerDist);
-                const canGoLeft = !arena.checkCollision(_tempNextPos, this.radius);
-                _tempNextPos.copy(this.position).addScaledVector(_tempRightDir, feelerDist);
-                const canGoRight = !arena.checkCollision(_tempNextPos, this.radius);
-                
-                if (canGoLeft && !canGoRight) {
-                    _tempDesiredDir.copy(_tempLeftDir);
-                } else if (canGoRight && !canGoLeft) {
-                    _tempDesiredDir.copy(_tempRightDir);
-                } else if (canGoLeft && canGoRight) {
-                    // Pick one randomly if both are open but forward is blocked
-                    _tempDesiredDir.copy(Math.random() > 0.5 ? _tempLeftDir : _tempRightDir);
-                } else {
-                    // Heavily blocked, try sharper turn to get unstuck
-                    _tempDesiredDir.applyAxisAngle(_upAxis, Math.PI / 1.5);
+            // Follow persistent corner waypoints rather than randomly switching sides.
+            this.pathTimer = (this.pathTimer || 0) - delta;
+            if (arena.findNavigationPath && !(canSpit && dist < 9)) {
+                if (this.pathTimer <= 0 || !this.navigationPath) {
+                    this.navigationPath = arena.findNavigationPath(this.position, player.position, this.radius);
+                    this.pathTimer = 0.9;
                 }
+                while (this.navigationPath.length && this.position.distanceTo(this.navigationPath[0]) < 0.25) this.navigationPath.shift();
+                if (this.navigationPath.length) _tempDesiredDir.subVectors(this.navigationPath[0], this.position).setY(0).normalize();
             }
-
             // Flanking behavior for sprinters
-            if (this.type === 'sprinter' && dist > 5) {
+            if (this.type === 'sprinter' && dist > 5 && !(this.navigationPath?.length > 1)) {
                 _tempDesiredDir.applyAxisAngle(_upAxis, Math.sin(performance.now() * 0.002 + this.position.x) * 0.6);
             }
 
@@ -457,19 +441,15 @@ export class Zombie {
         }
         _tempMoveVel.add(_tempSeparation);
 
-        // Apply movement with arena collision
-        const nextX = this.position.x + _tempMoveVel.x * delta;
-        const nextZ = this.position.z + _tempMoveVel.z * delta;
-
-        _tempCheckPos.set(nextX, this.position.y, this.position.z);
-        if (!arena.checkCollision(_tempCheckPos, this.radius)) {
-            this.position.x = nextX;
+        // Shared swept movement prevents corner snagging and tunneling.
+        if (arena.moveCharacter) {
+            arena.moveCharacter(this.position, _tempMoveVel.x * delta, _tempMoveVel.z * delta, this.radius);
+        } else {
+            _tempCheckPos.copy(this.position); _tempCheckPos.x += _tempMoveVel.x * delta;
+            if (!arena.checkCollision(_tempCheckPos, this.radius)) this.position.x = _tempCheckPos.x;
+            _tempCheckPos.copy(this.position); _tempCheckPos.z += _tempMoveVel.z * delta;
+            if (!arena.checkCollision(_tempCheckPos, this.radius)) this.position.z = _tempCheckPos.z;
         }
-        _tempCheckPos.set(this.position.x, this.position.y, nextZ);
-        if (!arena.checkCollision(_tempCheckPos, this.radius)) {
-            this.position.z = nextZ;
-        }
-
         this.mesh.position.copy(this.position);
         this.healthBar?.update(this.position, this.health, this.maxHealth, true);
 

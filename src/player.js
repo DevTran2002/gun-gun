@@ -440,22 +440,16 @@ export class PlayerController {
         // Gravity
         this.velocity.y -= this.gravity * delta;
 
-        // Apply movement with obstacle collision
-        const newX = this.position.x + this.velocity.x * delta;
-        const newZ = this.position.z + this.velocity.z * delta;
-
-        if (!arena.checkCollision(new THREE.Vector3(newX, this.position.y, this.position.z), this.radius)) {
-            this.position.x = newX;
+        // Sweep and slide the circular body, including recovery from overlap.
+        if (arena.moveCharacter) {
+            arena.moveCharacter(this.position, this.velocity.x * delta, this.velocity.z * delta, this.radius);
         } else {
-            this.velocity.x = 0;
+            const probe = this.position.clone();
+            probe.x += this.velocity.x * delta;
+            if (!arena.checkCollision(probe, this.radius)) this.position.x = probe.x;
+            probe.copy(this.position); probe.z += this.velocity.z * delta;
+            if (!arena.checkCollision(probe, this.radius)) this.position.z = probe.z;
         }
-
-        if (!arena.checkCollision(new THREE.Vector3(this.position.x, this.position.y, newZ), this.radius)) {
-            this.position.z = newZ;
-        } else {
-            this.velocity.z = 0;
-        }
-
         // Vertical collision
         this.position.y += this.velocity.y * delta;
         if (this.position.y <= 0) {
@@ -502,6 +496,7 @@ export class PlayerController {
         }
 
         // Weapon firing
+        this.weapons.updateHeldPose?.(this.model);
         this.handleShooting();
     }
 
@@ -542,7 +537,9 @@ export class PlayerController {
         if (shouldShoot) {
             // Compute muzzle origin from character right arm
             const muzzlePos = new THREE.Vector3();
-            if (this.handBone) {
+            if (this.weapons.getMuzzlePosition?.(muzzlePos)) {
+                // The projectile and flash now originate at the visible barrel.
+            } else if (this.handBone) {
                 this.model.updateMatrixWorld(true);
                 this.handBone.getWorldPosition(muzzlePos);
                 // Forward offset in character facing direction

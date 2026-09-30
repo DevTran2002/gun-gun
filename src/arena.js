@@ -1,8 +1,5 @@
 import * as THREE from 'three';
 
-const _tempArenaBox = new THREE.Box3();
-const _tempArenaMin = new THREE.Vector3();
-const _tempArenaMax = new THREE.Vector3();
 const _tempLosDir = new THREE.Vector3();
 const _tempLosRay = new THREE.Ray();
 const _tempLosHit = new THREE.Vector3();
@@ -199,6 +196,7 @@ export class Arena {
                 }
             }
 
+            instancedWalls.count = wIdx;
             instancedWalls.instanceMatrix.needsUpdate = true;
             this.scene.add(instancedWalls);
         }
@@ -299,8 +297,15 @@ export class Arena {
     }
 
     buildCenterPlaza() {
-        this.placeInstance('platform', new THREE.Vector3(0, 0, 0), 0, 4, true);
-        this.placeInstance('trophy', new THREE.Vector3(0, 0.8, 0), 0, 2.2, true);
+        // A flush plaza is walkable at the same height as the rest of the arena.
+        // The old raised platform was one large invisible movement barrier.
+        const plaza = new THREE.Mesh(new THREE.PlaneGeometry(9, 9),
+            new THREE.MeshStandardMaterial({ color: 0xd7bc89, roughness: 1 }));
+        plaza.rotation.x = -Math.PI / 2;
+        plaza.position.y = 0.025;
+        plaza.receiveShadow = true;
+        plaza.name = 'walkable-plaza';
+        this.scene.add(plaza);
 
         const colDist = 6;
         const colScale = 2.2;
@@ -309,8 +314,6 @@ export class Arena {
         this.placeInstance('column', new THREE.Vector3(-colDist, 0, colDist), 1.2, colScale, true);
         this.placeInstance('column-damaged', new THREE.Vector3(colDist, 0, colDist), 2.1, colScale, true);
 
-        this.placeInstance('stairs', new THREE.Vector3(0, 0, -3.2), 0, 1.8, false);
-        this.placeInstance('stairs', new THREE.Vector3(0, 0, 3.2), Math.PI, 1.8, false);
     }
 
     buildTacticalCover() {
@@ -364,6 +367,9 @@ export class Arena {
         const random = () => ((seed = (seed * 1664525 + 1013904223) >>> 0) / 4294967296);
         for (let i = 0; i < blades.count; i++) {
             dummy.position.set((random() - 0.5) * 216, 0.15, (random() - 0.5) * 216);
+            while (Math.abs(dummy.position.x) < 4.6 && Math.abs(dummy.position.z) < 4.6) {
+                dummy.position.set((random() - 0.5) * 216, 0.15, (random() - 0.5) * 216);
+            }
             dummy.rotation.y = random() * Math.PI;
             dummy.scale.set(1, 0.6 + random(), 1);
             dummy.updateMatrix();
@@ -407,17 +413,106 @@ export class Arena {
     }
 
     checkCollision(pos, radius = 0.5) {
-        _tempArenaMin.set(pos.x - radius, 0.1, pos.z - radius);
-        _tempArenaMax.set(pos.x + radius, 2.0, pos.z + radius);
-        _tempArenaBox.min.copy(_tempArenaMin);
-        _tempArenaBox.max.copy(_tempArenaMax);
-
         for (const col of this.colliders) {
-            if (col.intersectsBox(_tempArenaBox)) {
-                return true;
-            }
+            if (col.max.y <= pos.y + 0.1 || col.min.y >= pos.y + 1.9) continue;
+            const x = Math.max(col.min.x, Math.min(pos.x, col.max.x));
+            const z = Math.max(col.min.z, Math.min(pos.z, col.max.z));
+            if ((pos.x - x) ** 2 + (pos.z - z) ** 2 < radius * radius) return true;
         }
         return false;
+    }
+
+    moveCharacter(position, dx, dz, radius) {
+        // Resolve existing overlap first (spawn, knockback or a network correction).
+        for (let pass = 0; pass < 4; pass++) {
+            for (const box of this.colliders) {
+                if (box.max.y <= position.y + 0.1 || box.min.y >= position.y + 1.9) continue;
+                const x = Math.max(box.min.x, Math.min(position.x, box.max.x));
+                const z = Math.max(box.min.z, Math.min(position.z, box.max.z));
+                const ox = position.x - x, oz = position.z - z;
+                const distance = Math.hypot(ox, oz);
+                if (distance >= radius) continue;
+                if (distance > 0.00001) {
+                    position.x += ox / distance * (radius - distance + 0.001);
+                    position.z += oz / distance * (radius - distance + 0.001);
+                } else {
+                    const sides = [
+                        [Math.abs(position.x - (box.min.x - radius)), 'x', box.min.x - radius - 0.001],
+                        [Math.abs(position.x - (box.max.x + radius)), 'x', box.max.x + radius + 0.001],
+                        [Math.abs(position.z - (box.min.z - radius)), 'z', box.min.z - radius - 0.001],
+                        [Math.abs(position.z - (box.max.z + radius)), 'z', box.max.z + radius + 0.001]
+                    ].sort((a, b) => a[0] - b[0]);
+                    position[sides[0][1]] = sides[0][2];
+                }
+            }
+        }
+        const steps = Math.max(1, Math.ceil(Math.hypot(dx, dz) / (radius * 0.45)));
+        const probe = position.clone();
+        for (let step = 0; step < steps; step++) {
+            probe.copy(position); probe.x += dx / steps;
+            if (!this.checkCollision(probe, radius)) position.x = probe.x;
+            probe.copy(position); probe.z += dz / steps;
+            if (!this.checkCollision(probe, radius)) position.z = probe.z;
+        }
+    }
+
+    navigationClear(from, to, radius) {
+        const direction = new THREE.Vector3().subVectors(to, from);
+        direction.y = 0;
+        const length = direction.length();
+        const ray = new THREE.Ray(new THREE.Vector3(from.x, 1, from.z), direction.normalize());
+        const hit = new THREE.Vector3();
+        for (const collider of this.colliders) {
+            if (collider.max.y <= 0.1 || collider.min.y >= 1.9) continue;
+            const box = collider.clone();
+            box.min.x -= radius; box.max.x += radius;
+            box.min.z -= radius; box.max.z += radius;
+            box.min.y = 0; box.max.y = 2;
+            if (box.containsPoint(ray.origin)) return false;
+            if (ray.intersectBox(box, hit) && hit.distanceTo(ray.origin) < length) return false;
+        }
+        return true;
+    }
+
+    findNavigationPath(from, to, radius) {
+        if (this.navigationClear(from, to, radius)) return [to.clone()];
+        const nodes = [from.clone(), to.clone()];
+        const margin = radius + 0.16;
+        for (const box of this.colliders) {
+            if (box.max.y <= 0.1 || box.min.y >= 1.9) continue;
+            if (box.max.x < Math.min(from.x, to.x) - 8 || box.min.x > Math.max(from.x, to.x) + 8 ||
+                box.max.z < Math.min(from.z, to.z) - 8 || box.min.z > Math.max(from.z, to.z) + 8) continue;
+            for (const x of [box.min.x - margin, box.max.x + margin]) {
+                for (const z of [box.min.z - margin, box.max.z + margin]) {
+                    const point = new THREE.Vector3(x, 0, z);
+                    if (!this.checkCollision(point, radius)) nodes.push(point);
+                }
+            }
+        }
+        const costs = nodes.map(() => Infinity), parents = [], closed = new Set();
+        costs[0] = 0;
+        while (closed.size < nodes.length) {
+            let current = -1, best = Infinity;
+            for (let i = 0; i < nodes.length; i++) {
+                const value = costs[i] + nodes[i].distanceTo(to);
+                if (!closed.has(i) && value < best) { best = value; current = i; }
+            }
+            if (current < 0) break;
+            if (current === 1) {
+                const path = [];
+                for (let i = 1; i !== 0; i = parents[i]) path.unshift(nodes[i]);
+                return path;
+            }
+            closed.add(current);
+            for (let i = 1; i < nodes.length; i++) {
+                if (closed.has(i)) continue;
+                const cost = costs[current] + nodes[current].distanceTo(nodes[i]);
+                if (cost < costs[i] && this.navigationClear(nodes[current], nodes[i], radius)) {
+                    costs[i] = cost; parents[i] = current;
+                }
+            }
+        }
+        return [];
     }
 
     hasLineOfSight(fromPos, toPos) {

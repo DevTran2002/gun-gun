@@ -454,34 +454,17 @@ export class UIManager {
                 if (this.thAmmoReserve) this.thAmmoReserve.textContent = resAmmoStr;
             }
 
-            const silhId = curWeapon.id;
-            if (silhId !== this._lastActiveWeaponSilh) {
-                this._lastActiveWeaponSilh = silhId;
-                if (this.thActiveSilhouette) {
-                    if (curWeapon.isKnife) {
-                        this.thActiveSilhouette.innerHTML = `
-                            <svg class="th_svg_bat" viewBox="0 0 44 44" fill="none">
-                                <line x1="10" y1="34" x2="14" y2="30" stroke="#f8fafc" stroke-width="3" stroke-linecap="round"/>
-                                <line x1="14" y1="30" x2="34" y2="10" stroke="#f59e0b" stroke-width="5" stroke-linecap="round"/>
-                                <circle cx="34" cy="10" r="2.5" fill="#f59e0b"/>
-                            </svg>`;
-                    } else if (curWeapon.id === 'scatter' || curWeapon.id === 'nova') {
-                        this.thActiveSilhouette.innerHTML = `
-                            <svg class="th_svg_gun" viewBox="0 0 60 40" fill="none" stroke="#e2e8f0" stroke-width="1.8">
-                                <path d="M4 16 h44 v6 h-12 v4 h-6 v10 h-7 l-2 -4 l1 -6 h-18 z" fill="rgba(255,255,255,0.18)"/>
-                                <rect x="20" y="24" width="4" height="10" fill="#e2e8f0"/>
-                            </svg>`;
-                    } else {
-                        this.thActiveSilhouette.innerHTML = `
-                            <svg class="th_svg_gun" viewBox="0 0 60 40" fill="none" stroke="#e2e8f0" stroke-width="1.8">
-                                <path d="M8 12 h32 v8 h-4 v4 h-7 v12 h-9 l-3 -5 l2 -11 h-11 z" fill="rgba(255,255,255,0.18)"/>
-                                <path d="M22 24 h6 v3 h-6 z" fill="#e2e8f0"/>
-                                <line x1="8" y1="15" x2="36" y2="15"/>
-                            </svg>`;
-                    }
+            // Slot 1 always represents the equipped gun, even while using the knife.
+            const gun = player.weapons.weaponSlots[0];
+            if (gun?.id !== this._lastActiveWeaponSilh) {
+                this._lastActiveWeaponSilh = gun?.id;
+                if (this.thActiveSilhouette && gun?.icon) {
+                    const image = document.createElement('img');
+                    image.src = gun.icon;
+                    image.alt = gun.name;
+                    this.thActiveSilhouette.replaceChildren(image);
                 }
             }
-
             // CỤM 3: Hotbar 3 ô [1] Súng, [2] Dao, [3] Medkit
             const inv = player.weapons?.inventory || {};
             const isUsingMed = !!player.weapons?.isUsingMedkit;

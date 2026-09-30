@@ -233,7 +233,8 @@ export class NetworkRoom {
             if (command.type === 'reload') player.weapons.reload();
             if (command.type === 'switch') player.weapons.switchWeapon(command.slot);
             if (command.type === 'shoot' && Array.isArray(command.target) && command.target.length === 3 && command.target.every(Number.isFinite)) {
-                player.weapons.shoot(player.position.clone().add(new THREE.Vector3(0, 1.2, 0)), new THREE.Vector3().fromArray(command.target), !!command.ads, true);
+                const origin = player.weapons.getMuzzlePosition?.() || player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
+                player.weapons.shoot(origin, new THREE.Vector3().fromArray(command.target), !!command.ads, true);
             }
             player.processedSeq = command.seq;
         }
@@ -308,6 +309,7 @@ export function makeRemotePlayer(scene, loader, id, name, characterId = 'soldier
             if (next && action !== next) { action?.fadeOut(0.15); next.reset().fadeIn(0.15).play(); action = next; }
             mixer?.update(delta);
             this.weapons?.updateEquippedMesh();
+            this.weapons?.updateHeldPose(group);
             healthBar.update(group.position, this.health, this.maxHealth, group.visible);
         },
         checkHit(start, end, ray) { const hit = ray.intersectBox(new THREE.Box3(this.position.clone().add(new THREE.Vector3(-.55, 0, -.55)), this.position.clone().add(new THREE.Vector3(.55, 1.6, .55))), new THREE.Vector3()); return hit ? { hit: true, point: hit } : { hit: false }; },

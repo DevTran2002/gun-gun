@@ -9,14 +9,21 @@ export class HealthBar3D {
         this.group.renderOrder = 100;
 
         const background = new THREE.Mesh(
-            new THREE.BoxGeometry(width + 0.08, 0.085, 0.075),
-            new THREE.MeshBasicMaterial({ color: 0x101722, transparent: true, opacity: 0.92, depthTest: false, depthWrite: false })
+            new THREE.PlaneGeometry(width + 0.10, 0.18),
+            new THREE.MeshBasicMaterial({ color: 0x30283e, transparent: true, opacity: 1, depthTest: false, depthWrite: false, toneMapped: false })
         );
         this.fill = new THREE.Mesh(
-            new THREE.BoxGeometry(width, 0.06, 0.085),
-            new THREE.MeshBasicMaterial({ color, depthTest: false, depthWrite: false })
+            new THREE.PlaneGeometry(width, 0.10),
+            new THREE.MeshBasicMaterial({ color, transparent: true, depthTest: false, depthWrite: false, toneMapped: false })
         );
         this.fill.position.z = 0.006;
+        background.renderOrder = 100;
+        this.fill.renderOrder = 101;
+        // Keep both planes in the same render queue, with the colored fill last.
+        background.onBeforeRender = (_renderer, _scene, camera) => {
+            this.group.quaternion.copy(camera.quaternion);
+            this.group.updateMatrixWorld(true);
+        };
         this.group.add(background, this.fill);
         scene.add(this.group);
         this.update(new THREE.Vector3(), 1, 1, false);

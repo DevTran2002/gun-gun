@@ -566,9 +566,22 @@ export class WeaponSystem {
                     }
                 }
             });
-            mesh.scale.set(w.scale, w.scale, w.scale);
-            mesh.position.copy(w.offset);
-            mesh.rotation.copy(w.rotOffset);
+            // Kenney guns are ~0.8 model units long. Normalize to a readable
+            // 0.95–1.15 world units instead of shrinking them again on the arm.
+            const bounds = new THREE.Box3().setFromObject(mesh);
+            handNode.updateWorldMatrix(true, false);
+            const armScale = handNode.getWorldScale(new THREE.Vector3()).z;
+            const worldLength = w.modelFile.includes('blaster-a') ? 0.95 : 1.15;
+            const scale = worldLength / ((bounds.max.z - bounds.min.z) * armScale);
+            mesh.scale.setScalar(scale);
+            mesh.userData.gripOffset = new THREE.Vector3(0, 0.14, 0.18).multiplyScalar(scale);
+            mesh.userData.handOffset = w.offset.clone();
+            mesh.rotation.set(0, -Math.PI / 3, 0);
+            mesh.position.copy(mesh.userData.gripOffset).applyQuaternion(mesh.quaternion).add(mesh.userData.handOffset);
+            const muzzle = new THREE.Object3D();
+            muzzle.name = 'weapon-muzzle';
+            muzzle.position.set(0, 0.04, bounds.max.z + 0.025);
+            mesh.add(muzzle);
             mesh.visible = false;
             handNode.add(mesh);
             this.weaponMeshes[w.id] = mesh;
@@ -606,6 +619,24 @@ export class WeaponSystem {
         for (const [id, mesh] of Object.entries(this.weaponMeshes || {})) {
             mesh.visible = (id === currentId);
         }
+    }
+
+    updateHeldPose(character) {
+        const mesh = this.weaponMeshes?.[this.getCurrentWeapon().id];
+        if (!mesh?.userData.gripOffset || !this.handNode || !character) return;
+        this.handNode.updateWorldMatrix(true, false);
+        const parentRotation = this.handNode.getWorldQuaternion(new THREE.Quaternion());
+        const facing = character.getWorldQuaternion(new THREE.Quaternion());
+        mesh.quaternion.copy(parentRotation.invert().multiply(facing));
+        mesh.position.copy(mesh.userData.gripOffset).applyQuaternion(mesh.quaternion).add(mesh.userData.handOffset);
+        mesh.updateWorldMatrix(false, true);
+    }
+
+    getMuzzlePosition(target = new THREE.Vector3()) {
+        const muzzle = this.weaponMeshes?.[this.getCurrentWeapon().id]?.getObjectByName('weapon-muzzle');
+        if (!muzzle) return null;
+        muzzle.updateWorldMatrix(true, false);
+        return muzzle.getWorldPosition(target);
     }
 
     shoot(origin, targetPoint, isADS = false, isPlayer = true, damageMultiplier = 1.0, playerRef = null) {
@@ -691,7 +722,7 @@ export class WeaponSystem {
         }
 
         sounds.playShot(w.id);
-        this.particles.createMuzzleFlash(origin, new THREE.Vector3(0, 0, 1), w.color);
+        this.particles.createMuzzleFlash(origin, new THREE.Vector3().subVectors(targetPoint, origin).normalize(), w.color);
 
         const beams = isPlayer ? this.beamCount : 1;
         const spreadRad = THREE.MathUtils.degToRad(this.currentSpreadDeg);
