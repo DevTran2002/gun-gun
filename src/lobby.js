@@ -10,7 +10,7 @@ export class RoomLobby {
         this.members = new Map();
         this.signature = '';
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0xe8a43e);
+        this.scene.background = null;
         this.camera = new THREE.PerspectiveCamera(36, 2, 0.1, 100);
         this.camera.position.set(0, 4.7, 13.5);
         this.camera.lookAt(0, 1, 0);
@@ -18,15 +18,6 @@ export class RoomLobby {
         const light = new THREE.DirectionalLight(0xffffff, 3);
         light.position.set(-4, 8, 6);
         this.scene.add(light);
-        const floor = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshStandardMaterial({ color: 0xf2b84f, roughness: 1 }));
-        floor.rotation.x = -Math.PI / 2;
-        floor.position.y = -0.08;
-        this.scene.add(floor);
-        for (let i = 0; i < 4; i++) {
-            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.95, 0.14, 48), new THREE.MeshStandardMaterial({ color: 0xc78832 }));
-            base.position.set((i - 1.5) * 2.7, 0, 0);
-            this.scene.add(base);
-        }
     }
 
     load(character) {
@@ -43,7 +34,7 @@ export class RoomLobby {
         this.heading.className = 'lobby-heading';
         this.stage = document.createElement('div');
         this.stage.className = 'lobby-stage';
-        this.renderer = new THREE.WebGLRenderer({ antialias: true });
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
         this.renderer.domElement.setAttribute('aria-label', 'Các nhân vật đứng trong sảnh chờ');
         this.labels = document.createElement('div');
@@ -57,7 +48,9 @@ export class RoomLobby {
         this.mount();
         this.container.hidden = false;
         const players = data.players || [];
-        const signature = JSON.stringify([data.code, data.host, data.you, players]);
+        this.solo = !!data.solo;
+        this.container.classList?.toggle('solo-preview', this.solo);
+        const signature = JSON.stringify([data.code, data.host, data.you, players, this.solo]);
         if (signature === this.signature) return;
         this.signature = signature;
         this.heading.innerHTML = '';
@@ -114,8 +107,8 @@ export class RoomLobby {
                 this.load(character).then(gltf => {
                     if (this.members.get(player.id) !== pending) return;
                     const model = SkeletonUtils.clone(gltf.scene);
-                    model.scale.setScalar(2.7);
-                    model.rotation.y = -0.12;
+                    model.scale.setScalar(this.solo ? 4.4 : 2.7);
+                    model.rotation.y = -0.3;
                     pending.model = model;
                     this.scene.add(model);
                     pending.mixer = new THREE.AnimationMixer(model);
@@ -129,7 +122,10 @@ export class RoomLobby {
         }
     }
 
-    position(member) { member.model?.position.set((member.index - 1.5) * 2.7, 0.1, 0); }
+    position(member) {
+        member.model?.scale.setScalar(this.solo ? 4.4 : 2.7);
+        member.model?.position.set(this.solo ? 0 : (member.index - 1.5) * 2.7, 0.1, 0);
+    }
     remove(member) {
         member.mixer?.stopAllAction();
         if (member.model) { member.mixer?.uncacheRoot(member.model); member.model.removeFromParent(); }
@@ -142,10 +138,10 @@ export class RoomLobby {
             this.width = width; this.height = height;
             this.renderer.setSize(width, height);
             this.camera.aspect = width / height;
-            this.camera.position.z = Math.max(13.5, 17 / this.camera.aspect);
-            this.camera.lookAt(0, 1, 0);
             this.camera.updateProjectionMatrix();
         }
+        this.camera.position.set(0, this.solo ? 3.2 : 4.7, this.solo ? Math.max(7.8, 5.5 / this.camera.aspect) : Math.max(13.5, 17 / this.camera.aspect));
+        this.camera.lookAt(0, this.solo ? 2.1 : 1, 0);
         for (const member of this.members.values()) member.mixer?.update(delta);
         this.renderer.render(this.scene, this.camera);
     }

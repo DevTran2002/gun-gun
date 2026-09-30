@@ -11,6 +11,7 @@ import { UIManager } from './ui.js?v=4';
 import { NetworkRoom, makeRemotePlayer } from './network.js?v=4';
 import { normalizeCharacter } from './characters.js?v=4';
 import { RoomLobby } from './lobby.js?v=4';
+import { HomeMenu } from './home.js';
 
 class CyberArenaGame {
     constructor() {
@@ -111,6 +112,7 @@ class CyberArenaGame {
         this.roomCopy?.addEventListener('click', () => this.copyRoomCode());
         this.roomStart?.addEventListener('click', () => this.network.start().catch(e => this.showRoomError(e.message)));
         this.roomLeave?.addEventListener('click', () => this.network.leave());
+        this.homeMenu = new HomeMenu(this);
 
         this.finalScoreEl = document.getElementById('final-score');
         this.finalWaveEl = document.getElementById('final-wave');
@@ -200,6 +202,13 @@ class CyberArenaGame {
             if (this.screenLoading) this.screenLoading.style.display = 'none';
             if (this.screenMenu) this.screenMenu.style.display = 'flex';
             this.state = 'MENU';
+            
+            const urlParams = new URLSearchParams(window.location.search);
+            const roomCode = urlParams.get('room');
+            if (roomCode && this.roomCode) {
+                this.roomCode.value = roomCode;
+                this.joinRoom();
+            }
         }, 300);
 
         // Start animation loop
@@ -207,6 +216,7 @@ class CyberArenaGame {
     }
 
     startGame(fromRoom = false) {
+        this.homeMenu?.dialog.close();
         sounds.init();
         sounds.startMusic();
 
@@ -303,6 +313,7 @@ class CyberArenaGame {
         localStorage.setItem('cyber_arena_character', this.characterId);
         this.updateCharacterSelection();
         this.player.setCharacter(this.characterId);
+        this.homeMenu?.preview();
         if (this.network?.active) {
             this.network.changeCharacter?.(this.characterId);
         }
@@ -335,6 +346,7 @@ class CyberArenaGame {
     showRoomState(data) {
         if (!data) return;
         this.roomLobby?.update(data);
+        this.homeMenu?.room(data);
         this.screenMenu?.classList.add('party-menu');
         if (!this.roomStatus) return;
         const isHost = data.host === data.you || data.isHost;
@@ -349,6 +361,11 @@ class CyberArenaGame {
         if (this.roomCreate) this.roomCreate.disabled = true;
         if (this.roomJoin) this.roomJoin.disabled = true;
         if (this.btnStart) this.btnStart.style.display = 'none';
+        
+        if (data.code) {
+            const newUrl = window.location.pathname + '?room=' + data.code;
+            window.history.replaceState(null, '', newUrl);
+        }
     }
 
     resetRoomUI() {
@@ -363,6 +380,9 @@ class CyberArenaGame {
         if (this.roomJoin) this.roomJoin.disabled = false;
         if (this.btnStart) this.btnStart.style.display = 'inline-block';
         this.characterOptions?.forEach(option => { option.disabled = false; });
+        
+        window.history.replaceState(null, '', window.location.pathname);
+        this.homeMenu?.room(null);
     }
 
     ensureCoopPlayer(id, name, character = 'soldier') {

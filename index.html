@@ -306,71 +306,52 @@
         </div>
     </div>
 
-    <!-- Screen 2: Start Menu -->
-    <div id="screen-menu" class="screen-overlay" style="display: none;">
-        <div class="menu-box">
-            <h1 class="game-logo">ZOMBIE ARENA</h1>
-            <p class="game-sublogo">GÓC NHÌN TỪ TRÊN • CAMERA CỐ ĐỊNH</p>
-            <div class="mutation-guide">
-                <span class="runner">TỐC HÀNH <small>Phase 2 · Chạy áp sát</small></span>
-                <span class="acid">PHUN AXIT <small>Phase 2 · Né đạn xanh</small></span>
-                <span class="giant">KHỔNG LỒ <small>Phase 3 · Tránh vòng giậm</small></span>
-            </div>
-            <p class="loot-guide">Zombie chỉ có 10% cơ hội rơi đồ. Nhặt đạn để nạp súng; khi hết đạn, chuyển sang dao ở ô 2.<br>Nâng cấp cộng dồn đến hết lượt chơi.</p>
-
-            <div class="room-panel">
-                <div class="room-title">PHÒNG ONLINE • TỐI ĐA 4 NGƯỜI</div>
-                <input id="room-name" maxlength="24" placeholder="Tên của bạn" value="Người chơi">
-                <div class="character-label">CHỌN NHÂN VẬT</div>
-                <div class="character-options" role="group" aria-label="Chọn nhân vật">
-                    <button class="character-option selected" type="button" data-character="soldier" aria-pressed="true">
-                        <span class="character-silhouette soldier-silhouette"></span><span>LÍNH</span>
-                    </button>
-                    <button class="character-option" type="button" data-character="skeleton" aria-pressed="false">
-                        <span class="character-silhouette skeleton-silhouette"></span><span>KHUNG XƯƠNG</span>
-                    </button>
-                    <button class="character-option" type="button" data-character="vampire" aria-pressed="false">
-                        <span class="character-silhouette vampire-silhouette"></span><span>MA CÀ RỒNG</span>
-                    </button>
-                </div>
-                <div class="room-actions">
-                    <button id="room-create" class="btn-toggle">TẠO PHÒNG</button>
-                    <input id="room-code" maxlength="6" placeholder="MÃ PHÒNG">
-                    <button id="room-copy" class="btn-toggle" style="display:none;" title="Copy mã phòng">COPY MÃ</button>
-                    <button id="room-join" class="btn-toggle">VÀO PHÒNG</button>
-                </div>
-                <div id="room-status" class="room-status">Tạo phòng rồi gửi link này cho đồng đội. Bản public chạy online; bản local cần cùng Wi‑Fi.<br><small>Phòng yêu cầu ít nhất 2 người mới bắt đầu được.</small></div>
-                <div id="room-lobby" hidden aria-label="Người chơi trong phòng"></div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end; align-items: center; margin-top: 14px;">
-                    <button id="room-leave" class="btn-toggle" style="display:none; padding: 14px 20px; font-size: 13px;">RỜI PHÒNG</button>
-                    <button id="room-start" class="btn-action room-start" style="display:none; margin-top: 0;">BẮT ĐẦU PHÒNG</button>
-                </div>
-            </div>
-
-            <div class="controls-guide">
-                <div class="guide-col">
-                    <div class="guide-item"><span class="key-badge">WASD</span><span>Di chuyển theo màn hình</span></div>
-                    <div class="guide-item"><span class="key-badge">SPACE</span><span>Nhảy cao</span></div>
-                    <div class="guide-item"><span class="key-badge">E</span><span>Nhấn E gần đồng đội bị hạ để hồi sinh</span></div>
-                    <div class="guide-item"><span class="key-badge">B</span><span>Bật/Tắt đồng đội tập luyện (Bot)</span></div>
-                    <div class="guide-item"><span class="key-badge">Q</span><span>Luot ne don</span></div>
-                </div>
-                <div class="guide-col">
-                    <div class="guide-item"><span class="key-badge">CHUỘT</span><span>Di chuột ngắm · Giữ trái bắn</span></div>
-                    <div class="guide-item"><span class="key-badge">CHUỘT PHẢI</span><span>Bắn chính xác</span></div>
-                    <div class="guide-item"><span class="key-badge">1 / 2</span><span>1 súng · 2 dao</span></div>
-                    <div class="guide-item"><span class="key-badge">R</span><span>Nap dan</span></div>
-                </div>
-            </div>
-
-            <div class="highscore-badge">
-                KY LUC: <span id="menu-highscore">0</span> DIEM
-            </div>
-
-            <button id="btn-start" class="btn-action pulse">BAT DAU TAC CHIEN</button>
-        </div>
+    <!-- Full-screen character lobby -->
+    <div id="screen-menu" class="screen-overlay" style="display:none;">
+      <main class="home-shell">
+        <header class="home-header">
+          <button class="toy-button purple profile-button" data-open="profile"><span class="profile-avatar">★</span><span><strong id="profile-name">NGƯỜI CHƠI</strong><small>SỬA HỒ SƠ</small></span></button>
+          <button class="toy-button orange friends-button" data-open="friends"><span class="friends-icon">▣</span> BẠN BÈ <span class="button-badge">+</span></button>
+          <div class="score-pill" title="Điểm cao nhất"><span class="coin">★</span><span id="menu-highscore">0</span></div>
+        </header>
+        <nav class="home-nav" aria-label="Menu chính">
+          <button class="toy-button blue nav-tile" data-open="characters"><span class="tile-icon character-icon">♟</span><strong>NHÂN VẬT</strong><small>3 / 3</small></button>
+          <button class="toy-button blue nav-tile" data-open="help"><span class="tile-icon help-icon">?</span><strong>HƯỚNG DẪN</strong></button>
+          <button class="toy-button blue nav-tile" data-open="settings"><span class="tile-icon gear-icon">⚙</span><strong>CÀI ĐẶT</strong></button>
+        </nav>
+        <div id="room-lobby" aria-label="Xem trước nhân vật 3D"></div>
+        <button class="toy-button orange invite-button" data-open="friends" aria-label="Mời bạn vào phòng">+</button>
+        <footer class="home-footer">
+          <button class="toy-button blue record-button" data-open="records"><span>♜</span><span>KỶ LỤC<small>THÀNH TÍCH CỦA BẠN</small></span></button>
+          <div class="play-area">
+            <button id="room-leave" class="toy-button purple leave-button" style="display:none">RỜI PHÒNG</button>
+            <div class="mode-card purple"><div class="mode-ribbon" id="mode-status">SẴN SÀNG CHIẾN ĐẤU</div><div class="mode-content"><span>⏩</span><div><strong>VÔ TẬN</strong><small>ĐẤU TRƯỜNG ZOMBIE</small></div></div></div>
+            <button id="btn-start" class="toy-button yellow play-button">CHƠI</button>
+            <button id="room-start" class="toy-button yellow play-button" style="display:none">CHƠI</button>
+            <div id="guest-wait" hidden>ĐANG CHỜ CHỦ PHÒNG…</div>
+          </div>
+        </footer>
+        <dialog id="home-dialog" aria-labelledby="dialog-title">
+          <div class="dialog-header"><h2 id="dialog-title"></h2><button class="toy-button coral close-dialog" aria-label="Đóng">×</button></div>
+          <div class="dialog-body">
+            <section data-panel="friends" hidden>
+              <p class="eyebrow">PHÒNG CỦA BẠN · QUÉT MÃ HOẶC GỬI LINK</p>
+              <div class="share-room" id="share-room" hidden><div id="room-qr" aria-label="Mã QR mời bạn"></div><div><small>MÃ PHÒNG</small><strong id="share-code"></strong><button id="room-copy" class="text-button" style="display:none">COPY MÃ</button></div></div>
+              <button id="room-create" class="toy-button orange wide-button">+ TẠO PHÒNG CÙNG BẠN</button>
+              <div class="share-link-row" id="share-link-row" hidden><input id="share-link" readonly aria-label="Liên kết mời bạn"><button id="copy-link" class="toy-button blue">COPY</button></div>
+              <label class="eyebrow" for="room-code">HOẶC VÀO PHÒNG CỦA BẠN BÈ</label>
+              <div class="join-row"><input id="room-code" maxlength="6" placeholder="MÃ PHÒNG" autocomplete="off"><button id="room-join" class="toy-button orange">VÀO</button></div>
+              <p id="room-status" role="status">Tạo phòng và gửi liên kết để rủ bạn cùng chiến đấu. Tối đa 4 người.</p>
+            </section>
+            <section data-panel="profile" hidden><label class="eyebrow" for="room-name">TÊN CỦA BẠN</label><input id="room-name" maxlength="24" placeholder="Tên của bạn" value="Người chơi"><p>Tên sẽ hiển thị khi bạn tham gia phòng mới.</p><button id="save-profile" class="toy-button yellow wide-button">LƯU HỒ SƠ</button></section>
+            <section data-panel="characters" hidden><p>Chọn chiến binh cho trận đấu tiếp theo.</p><div class="character-options"><button class="toy-button character-option selected" data-character="soldier" aria-pressed="true"><span class="character-silhouette soldier-silhouette"></span>LÍNH</button><button class="toy-button character-option" data-character="skeleton" aria-pressed="false"><span class="character-silhouette skeleton-silhouette"></span>KHUNG XƯƠNG</button><button class="toy-button character-option" data-character="vampire" aria-pressed="false"><span class="character-silhouette vampire-silhouette"></span>MA CÀ RỒNG</button></div></section>
+            <section data-panel="help" hidden><div class="help-row"><kbd>W A S D</kbd><span>Di chuyển</span></div><div class="help-row"><kbd>CHUỘT</kbd><span>Ngắm · Giữ chuột trái để bắn</span></div><div class="help-row"><kbd>SPACE / Q</kbd><span>Nhảy / Lướt né</span></div><div class="help-row"><kbd>1 / 2 / R</kbd><span>Súng / Dao / Nạp đạn</span></div><div class="help-row"><kbd>E / B</kbd><span>Cứu đồng đội / Bật tắt bot</span></div><div class="help-row"><kbd>ESC</kbd><span>Tạm dừng trận đấu</span></div><p>Nhặt đạn và nâng cấp từ zombie. Hết đạn? Chuyển sang dao để tiếp tục sống sót!</p></section>
+            <section data-panel="settings" hidden><button id="home-sound" class="toy-button blue wide-button">ÂM THANH: BẬT</button><button id="home-music" class="toy-button purple wide-button">NHẠC: BẬT</button><p>Cài đặt được áp dụng ngay trong trận đấu.</p></section>
+            <section data-panel="records" hidden><p class="eyebrow">ĐIỂM CAO NHẤT TRÊN THIẾT BỊ NÀY</p><div class="record-value">★ <span id="record-score">0</span></div><p>Chiến đấu, sống sót và phá kỷ lục của chính bạn.</p></section>
+          </div>
+        </dialog>
+      </main>
     </div>
-
     <!-- Screen 3: Pause Menu -->
     <div id="screen-pause" class="screen-overlay" style="display: none;">
         <div class="menu-box">
@@ -410,6 +391,6 @@
     </div>
 
     <!-- Main Game Script -->
-    <script type="module" src="src/main.js?v=4"></script>
+    <script src="libs/qrcode.min.js"></script><script type="module" src="src/main.js?v=5"></script>
 </body>
 </html>
