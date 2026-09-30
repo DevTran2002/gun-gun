@@ -1,17 +1,18 @@
 import * as THREE from 'three';
 import { GLTFLoader } from '../libs/loaders/GLTFLoader.js';
-import { sounds } from './audio.js?v=4';
-import { ParticleSystem } from './particles.js?v=4';
-import { Arena } from './arena.js?v=4';
-import { WeaponSystem } from './weapons.js?v=4';
-import { PlayerController } from './player.js?v=4';
-import { WaveManager, Zombie } from './enemies.js?v=4';
-import { PickupManager } from './pickups.js?v=4';
-import { UIManager } from './ui.js?v=4';
-import { NetworkRoom, makeRemotePlayer } from './network.js?v=4';
-import { normalizeCharacter } from './characters.js?v=4';
-import { RoomLobby } from './lobby.js?v=4';
-import { HomeMenu } from './home.js';
+import { sounds } from './audio.js?v=6';
+import { ParticleSystem } from './particles.js?v=6';
+import { Arena } from './arena.js?v=6';
+import { WeaponSystem } from './weapons.js?v=6';
+import { PlayerController } from './player.js?v=6';
+import { WaveManager, Zombie } from './enemies.js?v=6';
+import { PickupManager } from './pickups.js?v=6';
+import { UIManager } from './ui.js?v=6';
+import { NetworkRoom, makeRemotePlayer } from './network.js?v=6';
+import { normalizeCharacter } from './characters.js?v=6';
+import { RoomLobby } from './lobby.js?v=6';
+import { HomeMenu } from './home.js?v=6';
+import { LootingSystem } from './looting.js?v=6';
 
 class CyberArenaGame {
     constructor() {
@@ -81,6 +82,7 @@ class CyberArenaGame {
         this.waveManager = new WaveManager(this.scene, this.gltfLoader, this.weapons, this.particles, this.arena);
         this.pickups = new PickupManager(this.scene, this.particles);
         this.ui = new UIManager();
+        this.lootingSystem = new LootingSystem(this.scene, this.particles, this.player, this.waveManager, this.ui);
         this.coopPlayers = [this.player];
     }
 
@@ -144,6 +146,11 @@ class CyberArenaGame {
         // Pause Key (ESC)
         window.addEventListener('keydown', (e) => {
             if (e.code === 'Escape') {
+                // Nếu đang mở hòm đồ, ưu tiên đóng hòm đồ trước và không mở menu pause
+                if (this.lootingSystem?.activeContainer?.isOpen) {
+                    this.lootingSystem.closeContainerUI();
+                    return;
+                }
                 if (this.state === 'PLAYING') {
                     this.pauseGame();
                 } else if (this.state === 'PAUSED') {
@@ -238,6 +245,7 @@ class CyberArenaGame {
         this.pickups.clear();
         this.particles.clear();
         this.waveManager.clear();
+        this.lootingSystem.spawnInitialContainers(this.arena);
 
         this.player.setInputEnabled(true);
         this.player.cooperative = this.network.active;
@@ -267,6 +275,7 @@ class CyberArenaGame {
     gameOver() {
         this.state = 'GAMEOVER';
         this.player.setInputEnabled(false);
+        this.lootingSystem?.closeContainerUI();
         this.ui.clearTeammateIndicators();
 
         if (this.score > this.highScore) {
@@ -292,6 +301,7 @@ class CyberArenaGame {
     onEnemyKilled(enemy) {
         this.score += enemy.scoreValue;
         this.pickups.spawnDrop(enemy.position, enemy.type);
+        this.lootingSystem?.handleEnemyKilled(enemy);
 
         if (enemy.type === 'boss') {
             this.ui.showBanner('MUTANT OVERLORD DESTROYED!');
@@ -678,12 +688,15 @@ class CyberArenaGame {
             // Update Particles
             this.particles.update(delta);
 
-            // Update UI & Radar with 4 Portals and Teammate Off-Screen Indicators
+            // Update Looting & Airdrop Ecosystem
+            this.lootingSystem.update(delta);
+
+            // Update UI & Radar with 4 Portals, Teammates, and Tactical Airdrop Zone
             const teammates = Array.from(this.remotePlayers.values());
             this.ui.updateStats(this.player, this.waveManager, this.score);
             this.ui.updateTeammateIndicators(teammates, this.player, this.camera);
             this.ui.updateTeamRoster(teammates, this.player);
-            this.ui.drawRadar(this.player, this.waveManager.enemies, this.pickups.pickups, this.arena.getPortals(), teammates);
+            this.ui.drawRadar(this.player, this.waveManager.enemies, this.pickups.pickups, this.arena.getPortals(), teammates, this.lootingSystem.activeAirdropZone);
         } else if (this.state === 'MENU' || this.state === 'LOADING') {
             this.player.updateCamera(delta);
             this.particles.update(delta);

@@ -259,6 +259,128 @@ class SoundManager {
         osc.stop(t + 0.32);
     }
 
+    // Tiếng sột soạt lục lọi túi đồ và hòm (Search Rustle Sound)
+    playSearchSound() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const bufferSize = this.ctx.sampleRate * 0.18;
+        const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (bufferSize * 0.45));
+        }
+
+        const noise = this.ctx.createBufferSource();
+        noise.buffer = buffer;
+
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'bandpass';
+        filter.frequency.setValueAtTime(800 + Math.random() * 400, t);
+        filter.Q.setValueAtTime(2.5, t);
+
+        const gain = this.ctx.createGain();
+        gain.gain.setValueAtTime(0.28, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+
+        noise.connect(filter);
+        filter.connect(gain);
+        gain.connect(this.masterGain);
+        noise.start(t);
+    }
+
+    // Tiếng nhận diện thành công vật phẩm (Item Reveal Chime)
+    playItemRevealSound() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(1174.66, t); // Nốt D6
+        osc.frequency.exponentialRampToValueAtTime(1760.00, t + 0.14); // Nốt A6
+
+        gain.gain.setValueAtTime(0.35, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.22);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.22);
+    }
+
+    // Tiếng chuyển đổi vật phẩm nhanh giữa 2 kho đồ (Loot Transfer)
+    playLootTransferSound() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(520, t);
+        osc.frequency.exponentialRampToValueAtTime(260, t + 0.08);
+
+        gain.gain.setValueAtTime(0.3, t);
+        gain.gain.exponentialRampToValueAtTime(0.001, t + 0.09);
+
+        osc.connect(gain);
+        gain.connect(this.masterGain);
+        osc.start(t);
+        osc.stop(t + 0.09);
+    }
+
+    // Tiếng động cơ máy bay gầm rú trên bầu trời với Stereo Panning từ trái sang phải
+    playAirdropPlaneSound() {
+        if (!this.enabled || !this.ctx) return;
+        this.resume();
+
+        const t = this.ctx.currentTime;
+        const duration = 4.2;
+
+        // Âm trầm động cơ phản lực tần số thấp
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(65, t);
+        osc.frequency.linearRampToValueAtTime(85, t + duration * 0.45);
+        osc.frequency.linearRampToValueAtTime(55, t + duration);
+
+        // Lọc qua lowpass để tạo độ đục như máy bay trên tầng mây cao
+        const filter = this.ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(280, t);
+        filter.frequency.linearRampToValueAtTime(420, t + duration * 0.45);
+        filter.frequency.linearRampToValueAtTime(220, t + duration);
+
+        // Stereo Panning từ loa trái sang loa phải
+        let panner = null;
+        if (this.ctx.createStereoPanner) {
+            panner = this.ctx.createStereoPanner();
+            panner.pan.setValueAtTime(-0.95, t);
+            panner.pan.linearRampToValueAtTime(0.95, t + duration);
+        }
+
+        // Âm lượng tăng dần khi tới gần đỉnh đầu rồi giảm dần khi bay xa
+        gain.gain.setValueAtTime(0.01, t);
+        gain.gain.linearRampToValueAtTime(0.48, t + duration * 0.4);
+        gain.gain.linearRampToValueAtTime(0.001, t + duration);
+
+        osc.connect(filter);
+        if (panner) {
+            filter.connect(panner);
+            panner.connect(gain);
+        } else {
+            filter.connect(gain);
+        }
+        gain.connect(this.masterGain);
+
+        osc.start(t);
+        osc.stop(t + duration);
+    }
+
     // Procedural Cyberpunk Bass & Synth Music Track
     startMusic() {
         if (!this.musicEnabled || this.isMusicPlaying || !this.ctx) return;

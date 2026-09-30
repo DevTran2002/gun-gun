@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { LOOT_ITEMS } from './looting.js';
 
 const _tempMateWorldPos = new THREE.Vector3();
 const _tempNdc = new THREE.Vector3();
@@ -163,6 +164,36 @@ export class UIManager {
         this._lastActiveWeaponSilh = '';
         this._lastSurvivalSlotKey = '';
         this._thClicksBound = false;
+
+        // Các phần tử giao diện Looting & Airdrop
+        this.containerPrompt = document.getElementById('container-prompt');
+        this.promptLabel = document.getElementById('prompt-label');
+
+        this.searchProgressContainer = document.getElementById('search-progress-container');
+        this.searchContainerName = document.getElementById('search-container-name');
+        this.searchCountdown = document.getElementById('search-countdown');
+        this.searchMeterFill = document.getElementById('search-meter-fill');
+
+        this.dualInventoryOverlay = document.getElementById('dual-inventory-overlay');
+        this.dualInvContainerName = document.getElementById('dual-inv-container-name');
+        this.dualInvCloseBtn = document.getElementById('dual-inv-close-btn');
+        this.playerCapacityText = document.getElementById('player-capacity-text');
+        this.playerGrid = document.getElementById('player-grid');
+        this.containerColumnTitle = document.getElementById('container-column-title');
+        this.containerCapacityText = document.getElementById('container-capacity-text');
+        this.containerGrid = document.getElementById('container-grid');
+        this.btnLootAll = document.getElementById('btn-loot-all');
+        this.inspectPanel = document.getElementById('item-inspect-panel');
+        this.inspectTitle = document.getElementById('inspect-title');
+        this.inspectDesc = document.getElementById('inspect-desc');
+
+        this._lootingSystem = null;
+        this._currentContainer = null;
+        this._currentPlayerInventory = null;
+        this._lootEventsBound = false;
+        this._dragData = null;
+        this._tempContainerWorldPos = new THREE.Vector3();
+        this._tempPromptNdc = new THREE.Vector3();
     }
 
     updateStats(player, waveManager, score) {
@@ -688,7 +719,7 @@ export class UIManager {
         }, 800);
     }
 
-    drawRadar(player, enemies, pickups, portals = [], teammates = []) {
+    drawRadar(player, enemies, pickups, portals = [], teammates = [], airdropZone = null) {
         if (!this.radarCtx) return;
         const ctx = this.radarCtx;
         const w = this.radarCanvas.width;
@@ -874,6 +905,50 @@ export class UIManager {
                 }
                 ctx.restore();
             }
+        }
+
+        // Vẽ vòng tròn vùng tiếp tế Airdrop trên Tactical Radar
+        if (airdropZone) {
+            const dx = airdropZone.x - pPos.x;
+            const dz = airdropZone.z - pPos.z;
+
+            const rx = dx * Math.cos(pYaw) - dz * Math.sin(pYaw);
+            const rz = dx * Math.sin(pYaw) + dz * Math.cos(pYaw);
+
+            const dist = Math.hypot(rx, rz);
+            const isOutside = dist > radarRange;
+            const drawDist = isOutside ? (radarRange - 2) : dist;
+            const scaleDist = dist > 0 ? (drawDist / dist) : 1;
+
+            const px = cx + (rx * scaleDist) * scale;
+            const py = cy + (rz * scaleDist) * scale;
+
+            ctx.save();
+            const pulse = (Math.sin(Date.now() * 0.008) * 0.4 + 0.6);
+            ctx.strokeStyle = `rgba(255, 30, 60, ${pulse})`;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = '#ff1e3c';
+            ctx.shadowBlur = 8;
+
+            // Vòng tròn bán kính Drop Zone
+            ctx.beginPath();
+            const zoneR = Math.max(5, (airdropZone.radius || 4.5) * scale);
+            ctx.arc(px, py, isOutside ? 5 : zoneR, 0, Math.PI * 2);
+            ctx.stroke();
+
+            // Chấm tâm Airdrop
+            ctx.fillStyle = '#ff1e3c';
+            ctx.beginPath();
+            ctx.arc(px, py, 2.5, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Chữ AIRDROP nhấp nháy
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 8px Rajdhani, sans-serif';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'bottom';
+            ctx.fillText('THÍNH', px, py - (isOutside ? 6 : zoneR + 2));
+            ctx.restore();
         }
 
         // Player central pointer (triangle pointing forward: up)
@@ -1258,6 +1333,286 @@ export class UIManager {
         for (const marker of this.teammateMarkers.values()) {
             marker.el.style.display = 'none';
         }
+    }
+
+    // Hiển thị gợi ý phím [F] tại vị trí 3D của hòm đồ
+    showContainerPrompt(label, position, camera) {
+        if (!this.containerPrompt) return;
+        if (label && this.promptLabel) {
+            this.promptLabel.textContent = label;
+        }
+
+        if (position && camera) {
+            this._tempContainerWorldPos.copy(position);
+            this._tempContainerWorldPos.y += 0.8;
+            this._tempPromptNdc.copy(this._tempContainerWorldPos).project(camera);
+
+            if (this._tempPromptNdc.z > -1 && this._tempPromptNdc.z < 1) {
+                const screenX = (this._tempPromptNdc.x * 0.5 + 0.5) * window.innerWidth;
+                const screenY = (-this._tempPromptNdc.y * 0.5 + 0.5) * window.innerHeight;
+                this.containerPrompt.style.left = `${Math.round(screenX)}px`;
+                this.containerPrompt.style.top = `${Math.round(screenY)}px`;
+                this.containerPrompt.style.display = 'flex';
+                return;
+            }
+        }
+        this.containerPrompt.style.display = 'none';
+    }
+
+    // Ẩn gợi ý mở hòm
+    hideContainerPrompt() {
+        if (this.containerPrompt) {
+            this.containerPrompt.style.display = 'none';
+        }
+    }
+
+    // Hiển thị thanh tiến trình lục hòm
+    showSearchProgress(duration, containerName) {
+        if (!this.searchProgressContainer) return;
+        if (this.searchContainerName) {
+            this.searchContainerName.textContent = containerName ? `ĐANG LỤC SOÁT: ${containerName.toUpperCase()}...` : 'ĐANG LỤC SOÁT...';
+        }
+        if (this.searchCountdown) {
+            this.searchCountdown.textContent = `${duration.toFixed(1)}s`;
+        }
+        if (this.searchMeterFill) {
+            this.searchMeterFill.style.width = '0%';
+        }
+        this.searchProgressContainer.style.display = 'block';
+    }
+
+    // Cập nhật thanh tiến trình lục hòm
+    updateSearchProgress(progress, remainingTime) {
+        if (!this.searchProgressContainer) return;
+        const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
+        if (this.searchMeterFill) {
+            this.searchMeterFill.style.width = `${pct}%`;
+        }
+        if (this.searchCountdown) {
+            this.searchCountdown.textContent = `${Math.max(0, remainingTime).toFixed(1)}s`;
+        }
+    }
+
+    // Ẩn thanh tiến trình lục hòm
+    hideSearchProgress() {
+        if (this.searchProgressContainer) {
+            this.searchProgressContainer.style.display = 'none';
+        }
+    }
+
+    // Gắn các sự kiện click, phím và kéo thả cho giao diện Dual-Grid
+    bindLootingEvents() {
+        if (this._lootEventsBound) return;
+        this._lootEventsBound = true;
+
+        if (this.dualInvCloseBtn) {
+            this.dualInvCloseBtn.addEventListener('click', () => {
+                this._lootingSystem?.closeContainerUI();
+            });
+        }
+
+        if (this.btnLootAll) {
+            this.btnLootAll.addEventListener('click', () => {
+                this._lootingSystem?.lootAll();
+            });
+        }
+    }
+
+    // Mở giao diện Hòm đồ hai bên (Dual-Grid Inventory UI)
+    openDualInventory(playerInventory, container, lootingSystem) {
+        if (!this.dualInventoryOverlay) return;
+        this._lootingSystem = lootingSystem;
+        this._currentContainer = container;
+        this._currentPlayerInventory = playerInventory;
+        this.bindLootingEvents();
+
+        if (this.dualInvContainerName) {
+            this.dualInvContainerName.textContent = container.name || 'HÒM ĐỒ CHIẾN THUẬT';
+        }
+        if (this.containerColumnTitle) {
+            this.containerColumnTitle.textContent = (container.name || 'NGĂN CHỨA HÒM').toUpperCase();
+        }
+
+        this.refreshDualInventory();
+        this.dualInventoryOverlay.style.display = 'flex';
+
+        // Đặt lại bảng soi vật phẩm mặc định
+        if (this.inspectTitle) this.inspectTitle.textContent = 'HÃY CHỌN HOẶC RÊ CHUỘT VÀO VẬT PHẨM ĐỂ XEM CHI TIẾT';
+        if (this.inspectDesc) this.inspectDesc.textContent = 'Vật phẩm có dấu chấm hỏi [?] cần 0.5s để nhận diện trước khi lấy.';
+    }
+
+    // Đóng giao diện Hòm đồ hai bên
+    closeDualInventory() {
+        if (this.dualInventoryOverlay) {
+            this.dualInventoryOverlay.style.display = 'none';
+        }
+        this._currentContainer = null;
+        this._lootingSystem = null;
+    }
+
+    // Cập nhật lại toàn bộ ô của túi đồ và hòm đồ
+    refreshDualInventory() {
+        if (!this._currentPlayerInventory || !this._currentContainer) return;
+
+        // 1. Cập nhật Player Grid
+        if (this.playerGrid) {
+            this.playerGrid.innerHTML = '';
+            const pSlots = this._currentPlayerInventory.slots;
+            const pCapacity = this._currentPlayerInventory.capacity;
+            let pFilled = 0;
+
+            for (let i = 0; i < pCapacity; i++) {
+                const slot = pSlots[i];
+                if (slot) pFilled++;
+                const slotEl = this.createInventorySlotElement(slot, i, 'player');
+                this.playerGrid.appendChild(slotEl);
+            }
+
+            if (this.playerCapacityText) {
+                this.playerCapacityText.textContent = `${pFilled} / ${pCapacity} Ô`;
+            }
+        }
+
+        // 2. Cập nhật Container Grid
+        if (this.containerGrid) {
+            this.containerGrid.innerHTML = '';
+            const cSlots = this._currentContainer.slots;
+            const cCapacity = cSlots.length;
+            let cFilled = 0;
+
+            for (let j = 0; j < cCapacity; j++) {
+                const slot = cSlots[j];
+                if (slot) cFilled++;
+                const slotEl = this.createInventorySlotElement(slot, j, 'container');
+                this.containerGrid.appendChild(slotEl);
+            }
+
+            if (this.containerCapacityText) {
+                this.containerCapacityText.textContent = `${cFilled} / ${cCapacity} Ô`;
+            }
+        }
+    }
+
+    // Tạo phần tử DOM cho một ô vật phẩm trong lưới Dual-Grid
+    createInventorySlotElement(slot, index, side) {
+        const el = document.createElement('div');
+        el.className = 'inv-slot';
+        el.dataset.index = index;
+        el.dataset.side = side;
+
+        if (!slot) {
+            el.classList.add('empty');
+            el.innerHTML = '<span class="slot-empty-dash">-</span>';
+
+            // Hỗ trợ thả (drop) đồ vào ô trống
+            el.addEventListener('dragover', (e) => e.preventDefault());
+            el.addEventListener('drop', (e) => {
+                e.preventDefault();
+                if (this._dragData && this._dragData.side !== side) {
+                    this._lootingSystem?.transferItem(this._dragData.side, this._dragData.index);
+                }
+            });
+            return el;
+        }
+
+        // Trường hợp ô trong hòm chưa được khám phá (Item Reveal Mechanic)
+        if (side === 'container' && !slot.revealed) {
+            el.classList.add('slot-unrevealed');
+            el.id = `container-slot-${index}`;
+            el.innerHTML = `<span class="unrevealed-question">?</span><small class="unrevealed-label">0.5s</small>`;
+            el.title = 'Click chuột để nhận diện vật phẩm (0.5s)';
+
+            el.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this._lootingSystem?.startRevealItem(index);
+            });
+
+            el.addEventListener('mouseenter', () => {
+                if (this.inspectTitle) this.inspectTitle.textContent = 'VẬT PHẨM CHƯA NHẬN DIỆN [?]';
+                if (this.inspectDesc) this.inspectDesc.textContent = 'Nhấp chuột trái vào ô này để lục tìm và nhận diện chi tiết (tốn 0.5s).';
+            });
+
+            return el;
+        }
+
+        // Ô đã có vật phẩm xác định
+        const itemDef = LOOT_ITEMS[slot.itemId];
+        const rarity = itemDef?.rarity || 'common';
+        el.classList.add(`rarity-${rarity}`);
+        el.id = `${side}-slot-${index}`;
+        el.draggable = true;
+
+        el.innerHTML = `
+            <span class="slot-item-icon" style="color: ${itemDef?.color || '#fff'};">${itemDef?.icon || 'ITM'}</span>
+            <span class="slot-item-name">${itemDef?.name || slot.itemId}</span>
+            ${slot.count > 1 ? `<span class="slot-item-count">×${slot.count}</span>` : ''}
+        `;
+
+        // Tooltip soi vật phẩm khi hover
+        el.addEventListener('mouseenter', () => {
+            if (this.inspectTitle) {
+                this.inspectTitle.textContent = (itemDef?.name || slot.itemId).toUpperCase();
+                this.inspectTitle.style.color = itemDef?.color || '#ffdf8a';
+            }
+            if (this.inspectDesc) {
+                const desc = itemDef?.description || 'Không có mô tả.';
+                const val = itemDef?.value ? ` · Giá trị: ${itemDef.value} Điểm` : '';
+                this.inspectDesc.textContent = `${desc}${val}`;
+            }
+        });
+
+        // Click chuột trái: Hỗ trợ Shift + Click chuyển nhanh hoặc Click nhặt sang túi đối diện
+        el.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (e.shiftKey) {
+                // Shift + Click: Chuyển nhanh sang bên kia
+                this._lootingSystem?.transferItem(side, index);
+            } else if (side === 'container') {
+                // Click thường vào item hòm đã nhận diện: nhặt sang người chơi
+                this._lootingSystem?.transferItem('container', index);
+            }
+        });
+
+        // Click chuột phải: Sử dụng vật phẩm ngay từ túi đồ
+        el.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            if (side === 'player') {
+                this._lootingSystem?.useItem(index);
+            }
+        });
+
+        // Drag & Drop: Kéo thả vật phẩm qua lại giữa 2 bên
+        el.addEventListener('dragstart', (e) => {
+            this._dragData = { side, index };
+            el.classList.add('dragging');
+            e.dataTransfer.setData('text/plain', `${side}:${index}`);
+        });
+
+        el.addEventListener('dragend', () => {
+            el.classList.remove('dragging');
+            this._dragData = null;
+        });
+
+        el.addEventListener('dragover', (e) => e.preventDefault());
+
+        el.addEventListener('drop', (e) => {
+            e.preventDefault();
+            if (this._dragData && this._dragData.side !== side) {
+                this._lootingSystem?.transferItem(this._dragData.side, this._dragData.index);
+            }
+        });
+
+        return el;
+    }
+
+    // Cập nhật tiến trình mở ô bí ẩn 0.5s
+    updateRevealingProgress(slotIndex, progress) {
+        const slotEl = document.getElementById(`container-slot-${slotIndex}`);
+        if (!slotEl) return;
+        slotEl.classList.add('slot-revealing');
+        const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
+        slotEl.innerHTML = `<span class="unrevealed-question">?</span><small class="unrevealed-label">${pct}%</small>`;
     }
 }
 

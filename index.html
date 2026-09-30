@@ -77,7 +77,84 @@
         <div id="th-medkit-channel" class="combat-channel combat-panel" style="display:none"><span>ĐANG SƠ CỨU <b id="th-medkit-countdown">5.0s</b></span><div class="combat-meter health-meter"><div id="th-medkit-channel-fill"></div></div></div>
         <div id="upgrade-stats" class="combat-upgrades"></div>
       </div>
-      <div class="combat-controls"><kbd>WASD</kbd> Di chuyển <kbd>R</kbd> Nạp đạn <kbd>Q</kbd> Né <kbd>ESC</kbd> Tạm dừng</div>
+      <!-- Gợi ý tương tác mở hòm [F] -->
+      <div id="container-prompt" class="container-prompt" style="display:none;">
+        <span class="prompt-key">[F]</span>
+        <span id="prompt-label" class="prompt-label">LỤC HÒM QUÂN SỰ</span>
+      </div>
+
+      <!-- Thanh tiến trình lục hòm Searching Progress Bar -->
+      <div id="search-progress-container" class="search-progress-container" style="display:none;">
+        <div class="search-panel combat-panel">
+          <div class="search-panel-title">
+            <span id="search-container-name">ĐANG LỤC SOÁT THÙNG GỖ...</span>
+            <span id="search-countdown" class="search-countdown">2.0s</span>
+          </div>
+          <div class="search-meter">
+            <div id="search-meter-fill" class="search-meter-fill"></div>
+          </div>
+          <div class="search-warning">DI CHUYỂN HOẶC BẮN SẼ HỦY LỤC ĐỒ!</div>
+        </div>
+      </div>
+
+      <!-- Giao diện Hòm đồ hai bên (Dual-Grid Inventory UI) -->
+      <div id="dual-inventory-overlay" class="dual-inventory-overlay" style="display:none;">
+        <div class="dual-inventory-window combat-panel">
+          <div class="dual-inv-header">
+            <div class="dual-inv-title">
+              <span class="inv-badge">EXTRACTION LOOTING</span>
+              <h2 id="dual-inv-container-name">THÙNG HÀNG CHIẾN THUẬT</h2>
+            </div>
+            <button id="dual-inv-close-btn" class="dual-inv-close" title="Đóng [ESC]">✕</button>
+          </div>
+
+          <div class="dual-inv-columns">
+            <!-- Cột trái: Túi đồ của Người chơi -->
+            <div class="inv-column player-column">
+              <div class="column-header">
+                <span>TÚI ĐỒ CHIẾN BINH</span>
+                <small id="player-capacity-text">0 / 16 Ô</small>
+              </div>
+              <div id="player-grid" class="inv-grid grid-player">
+                <!-- 16 ô túi đồ -->
+              </div>
+            </div>
+
+            <!-- Cột giữa: Thao tác nhanh & Hướng dẫn -->
+            <div class="inv-middle-actions">
+              <button id="btn-loot-all" class="toy-button orange loot-all-btn" title="Nhặt toàn bộ [Space]">
+                <span>NHẶT TẤT CẢ</span>
+                <kbd>SPACE</kbd>
+              </button>
+              <div class="quick-action-tips">
+                <div><kbd>SHIFT + CLICK</kbd> Chuyển nhanh</div>
+                <div><kbd>CLICK</kbd> Nhận diện [?] (0.5s)</div>
+                <div><kbd>CHUỘT PHẢI</kbd> Dùng ngay</div>
+                <div><kbd>ESC / F</kbd> Đóng hòm</div>
+              </div>
+            </div>
+
+            <!-- Cột phải: Ngăn chứa của Hòm đồ -->
+            <div class="inv-column container-column">
+              <div class="column-header">
+                <span id="container-column-title">NGĂN CHỨA HÒM</span>
+                <small id="container-capacity-text">0 / 8 Ô</small>
+              </div>
+              <div id="container-grid" class="inv-grid grid-container">
+                <!-- Các ô hòm đồ -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Chi tiết vật phẩm đang được chọn / hover -->
+          <div id="item-inspect-panel" class="item-inspect-panel">
+            <div id="inspect-title" class="inspect-title">HÃY CHỌN HOẶC RÊ CHUỘT VÀO VẬT PHẨM ĐỂ XEM CHI TIẾT</div>
+            <div id="inspect-desc" class="inspect-desc">Vật phẩm có dấu chấm hỏi [?] cần 0.5s để nhận diện trước khi lấy.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="combat-controls"><kbd>WASD</kbd> Di chuyển <kbd>R</kbd> Nạp đạn <kbd>Q</kbd> Né <kbd>F</kbd> Lục hòm <kbd>ESC</kbd> Tạm dừng</div>
       <div id="teammate-indicators" class="teammate-indicators-container"></div>
     </div>
     <!-- Screen 1: Loading Screen -->

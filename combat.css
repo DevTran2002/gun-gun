@@ -39,3 +39,51 @@
 @media(max-width:1050px) { .combat-controls { display:none; }.combat-vitals { width:220px; }.combat-loadout { bottom:35px; } }
 @media(max-width:650px) { .combat-vitals { top:10px; left:10px; width:160px; padding:9px; }.combat-card-title { font-size:9px; margin-bottom:7px; }.vital-label { font-size:10px; }.combat-meter { height:14px; }.shield-meter { height:9px; }.combat-wave { top:10px; left:auto; right:10px; transform:none; min-width:100px; padding:8px; }.combat-wave>strong { font-size:23px; }.combat-kicker { font-size:8px; }.enemy-count { font-size:8px; }.combat-radar { top:120px; right:10px; padding:5px; }.combat-radar #radar-canvas { width:75px; height:75px; }.radar-key { display:none; }.combat-loadout { width:calc(100% - 20px); gap:6px; bottom:35px; }.combat-weapon-info { flex:1; min-width:0; width:auto; padding:8px; }.combat-slot { width:61px; min-height:89px; flex-shrink:0; }.combat-slot>small { font-size:8px; }#th-active-silhouette { width:50px; }.combat-ammo small { display:none; }.combat-ammo>strong { font-size:26px; }.combat-ammo>span { font-size:13px; }.combat-upgrades { font-size:8px; }.combat-boss { top:115px; width:180px; left:10px; transform:none; }#hud .team-roster-panel { top:165px; left:10px; }#hud .announcement-banner { font-size:15px; padding:8px 12px; } }
 @media(max-height:550px) and (min-width:651px) { .combat-vitals { top:10px; left:10px; padding:8px 12px; width:185px; }.combat-wave { top:10px; }.combat-radar { top:10px; right:10px; }.combat-radar #radar-canvas { width:75px; height:75px; }.combat-loadout { bottom:28px; }.combat-slot { min-height:75px; }.combat-weapon-info { padding:5px 12px; } }
+
+/* Gợi ý tương tác mở hòm [F] */
+.container-prompt { position:absolute; pointer-events:none; z-index:110; display:flex; align-items:center; gap:8px; padding:6px 14px; background:rgba(30,24,43,0.92); border:2px solid #ffbe57; border-radius:9px; box-shadow:0 4px 15px rgba(0,0,0,0.6); transform:translate(-50%,-100%); transition:opacity .15s ease; }
+.container-prompt .prompt-key { background:#ffbe57; color:#2a1f33; font-weight:1000; font-size:13px; padding:2px 7px; border-radius:5px; }
+.container-prompt .prompt-label { color:#fff4d6; font-size:11px; font-weight:900; letter-spacing:0.5px; }
+
+/* Thanh tiến trình lục hòm Searching Progress Bar */
+.search-progress-container { position:absolute; top:calc(50% + 55px); left:50%; transform:translate(-50%,0); z-index:125; pointer-events:none; }
+.search-panel { min-width:260px; padding:10px 16px; text-align:center; border-color:#ffd06b; box-shadow:0 0 20px rgba(255,208,107,0.4); }
+.search-panel-title { display:flex; justify-content:space-between; font-size:11px; font-weight:900; color:#ffe5aa; margin-bottom:6px; }
+.search-countdown { font-variant-numeric:tabular-nums; color:#ffd06b; font-size:13px; }
+.search-meter { height:10px; width:100%; border:1.5px solid #302639; border-radius:6px; overflow:hidden; background:#2b2336; margin-bottom:6px; }
+.search-meter-fill { height:100%; width:0%; background:linear-gradient(90deg,#ff9e42,#ffd06b); transition:width .05s linear; }
+.search-warning { font-size:8px; font-weight:800; color:#ff9a90; letter-spacing:0.5px; }
+
+/* Giao diện Hòm đồ hai bên (Dual-Grid Inventory UI) */
+.dual-inventory-overlay { position:fixed; inset:0; background:rgba(16,12,24,0.78); backdrop-filter:blur(8px); z-index:200; display:flex; align-items:center; justify-content:center; pointer-events:auto; font-family:'Nunito','Segoe UI',sans-serif; }
+.dual-inventory-window { width:780px; max-width:95vw; max-height:90vh; padding:18px 24px; border:2px solid #5a4b70; border-radius:16px; background:linear-gradient(155deg,#4f4165,#2f253b); box-shadow:0 12px 40px rgba(0,0,0,0.8),inset 0 2px rgba(255,255,255,0.2); display:flex; flex-direction:column; gap:14px; }
+.dual-inv-header { display:flex; justify-content:space-between; align-items:center; border-bottom:1.5px solid #4a3a5e; padding-bottom:10px; }
+.inv-badge { font-size:9px; font-weight:1000; letter-spacing:1.5px; color:#00f0ff; background:rgba(0,240,255,0.12); padding:2px 8px; border-radius:4px; border:1px solid rgba(0,240,255,0.3); }
+.dual-inv-title h2 { margin:4px 0 0; font-size:20px; font-weight:1000; color:#fff8e8; letter-spacing:0.5px; }
+.dual-inv-close { background:#e94c6b; color:white; border:none; width:32px; height:32px; border-radius:8px; font-size:16px; font-weight:bold; cursor:pointer; }
+.dual-inv-columns { display:grid; grid-template-columns:1fr 140px 1fr; gap:16px; align-items:start; }
+.inv-column { background:rgba(26,20,36,0.65); border:1.5px solid #413352; border-radius:12px; padding:12px; display:flex; flex-direction:column; gap:10px; }
+.column-header { display:flex; justify-content:space-between; font-size:11px; font-weight:1000; color:#e6daf7; }
+.inv-grid { display:grid; gap:8px; }
+.grid-player { grid-template-columns:repeat(4,1fr); }
+.grid-container { grid-template-columns:repeat(3,1fr); }
+.inv-slot { aspect-ratio:1; min-height:56px; border:1.5px solid #3c2f4d; border-radius:8px; background:rgba(48,38,63,0.7); display:flex; flex-direction:column; align-items:center; justify-content:center; position:relative; cursor:pointer; transition:all .15s ease; user-select:none; }
+.inv-slot:hover { border-color:#ffd06b; background:rgba(72,58,94,0.85); transform:translateY(-2px); }
+.inv-slot.empty { cursor:default; opacity:0.45; border-style:dashed; }
+.inv-slot.empty:hover { transform:none; border-color:#3c2f4d; background:rgba(48,38,63,0.7); }
+.slot-unrevealed { background:rgba(22,17,30,0.85); border-color:#2b2039; color:#88789e; font-size:22px; font-weight:1000; }
+.slot-unrevealed:hover { border-color:#00f0ff; color:#00f0ff; box-shadow:0 0 10px rgba(0,240,255,0.3); }
+.slot-item-icon { font-size:15px; font-weight:1000; line-height:1; letter-spacing:-0.5px; }
+.slot-item-name { font-size:8px; font-weight:800; text-align:center; max-width:90%; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; margin-top:3px; }
+.slot-item-count { position:absolute; bottom:3px; right:5px; font-size:9px; font-weight:1000; color:#fff; text-shadow:0 1px 2px #000; }
+.inv-slot.rarity-common { border-color:#64748b; }
+.inv-slot.rarity-rare { border-color:#0284c7; box-shadow:inset 0 0 8px rgba(2,132,199,0.2); }
+.inv-slot.rarity-epic { border-color:#9333ea; box-shadow:inset 0 0 10px rgba(147,51,234,0.25); }
+.inv-slot.rarity-legendary { border-color:#f59e0b; box-shadow:inset 0 0 12px rgba(245,158,11,0.35); }
+.inv-middle-actions { display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; height:100%; }
+.loot-all-btn { width:100%; padding:12px 6px; font-size:12px; display:flex; flex-direction:column; gap:4px; align-items:center; }
+.quick-action-tips { font-size:9px; color:#d0c4df; display:flex; flex-direction:column; gap:5px; font-weight:700; text-align:center; }
+.quick-action-tips kbd { font-size:8px; padding:2px 4px; }
+.item-inspect-panel { background:rgba(18,14,26,0.7); border:1.5px solid #3c2f4d; border-radius:10px; padding:10px 14px; min-height:52px; }
+.inspect-title { font-size:12px; font-weight:1000; color:#ffdf8a; margin-bottom:3px; }
+.inspect-desc { font-size:10px; font-weight:700; color:#cfc2df; line-height:1.35; }

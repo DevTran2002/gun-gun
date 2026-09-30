@@ -60,6 +60,7 @@ export class PlayerController {
         this.reviveRequested = false;
         this.toggleBotRequested = false;
         this.isADS = false;
+        this.isSearching = false;
 
         // Core Gunplay: Cursor Kickback & Screen Shake Trauma
         this.cursorKick = new THREE.Vector2(0, 0);
@@ -244,7 +245,10 @@ export class PlayerController {
     tryDodge() {
         if (this.dodgeCooldown > 0 || this.isDead || !this.isGrounded) return;
 
-        // Reload cancel khi né đòn
+        // Hủy lục hòm và hủy nạp đạn khi né đòn
+        if (this.isSearching) {
+            window.game?.lootingSystem?.cancelSearch();
+        }
         this.weapons.cancelReload();
 
         const moveDir = this.getMovementInput();
@@ -302,6 +306,9 @@ export class PlayerController {
         }
 
         if (amount > 0) {
+            if (this.isSearching) {
+                window.game?.lootingSystem?.cancelSearch();
+            }
             this.health -= amount;
             this.painTimer = 4.0;
             sounds.play('enemyHurt', { volume: 0.6, rate: 1.1 });
@@ -414,7 +421,9 @@ export class PlayerController {
         const moveDir = this.getMovementInput();
         const isMoving = moveDir.lengthSq() > 0.01;
 
-        if (!this.isDodging) {
+        if (this.isSearching) {
+            this.velocity.set(0, 0, 0);
+        } else if (!this.isDodging) {
             if (isMoving) {
                 this.velocity.x = moveDir.x * currentSpeed;
                 this.velocity.z = moveDir.z * currentSpeed;
@@ -530,7 +539,7 @@ export class PlayerController {
     }
 
     handleShooting() {
-        if (!this.inputEnabled || !this.pointerInCanvas || this.isDead) return;
+        if (!this.inputEnabled || !this.pointerInCanvas || this.isDead || this.isSearching) return;
 
         const w = this.weapons.getCurrentWeapon();
         const shouldShoot = w.isAuto ? this.mouseButtons.left : (this.mouseButtons.left && this.weapons.fireCooldown <= 0);
@@ -590,6 +599,7 @@ export class PlayerController {
         this.invulnerability = 0;
         this.aimYaw = Math.PI;
         this.isADS = false;
+        this.isSearching = false;
         this.cameraFocus.set(this.position.x, 0.7, this.position.z);
         this.aimPoint.copy(this.position).add(new THREE.Vector3(0, 0.85, -10));
         this.updateCamera(0);
