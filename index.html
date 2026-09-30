@@ -39,9 +39,36 @@
       <section class="combat-radar combat-panel"><span class="combat-kicker">BẢN ĐỒ</span><canvas id="radar-canvas" width="140" height="140"></canvas><span class="radar-key">● BẠN <i>● ZOMBIE</i></span></section>
       <div id="boss-health-container" class="combat-boss" style="display:none"><span>TRÙM ĐỘT BIẾN</span><div class="combat-meter health-meter"><div id="boss-health-fill"></div></div></div>
       <div id="team-roster" class="team-roster-panel" style="display:none"></div>
-      <div id="crosshair" class="crosshair"><div class="cross-dot"></div><div class="cross-line top"></div><div class="cross-line bottom"></div><div class="cross-line left"></div><div class="cross-line right"></div></div>
+      <div id="crosshair" class="crosshair">
+        <div class="cross-dot"></div>
+        <div class="cross-line top"></div>
+        <div class="cross-line bottom"></div>
+        <div class="cross-line left"></div>
+        <div class="cross-line right"></div>
+        <!-- Vòng nạp đạn SVG ôm sát con trỏ ngắm -->
+        <svg id="crosshair-reload-ring" class="crosshair-reload-ring" viewBox="0 0 64 64" aria-hidden="true">
+          <circle class="reload-ring-bg" cx="32" cy="32" r="22"></circle>
+          <circle id="reload-ring-bar" class="reload-ring-bar" cx="32" cy="32" r="22"></circle>
+        </svg>
+      </div>
       <div id="hitmarker" class="hitmarker"><div class="marker-arm arm-tl"></div><div class="marker-arm arm-tr"></div><div class="marker-arm arm-bl"></div><div class="marker-arm arm-br"></div></div>
-      <div class="hud-center"><div id="announcement-banner" class="announcement-banner"></div><div id="pickup-alert" class="pickup-alert"></div><div id="floating-numbers" class="floating-numbers-container"></div></div>
+      <div class="hud-center">
+        <div id="announcement-banner" class="announcement-banner"></div>
+        <div id="pickup-alert" class="pickup-alert"></div>
+        <div id="floating-numbers" class="floating-numbers-container"></div>
+        <!-- HUD Loading thay đạn trung tâm màn hình với hiệu ứng báo sắp xong -->
+        <div id="hud-center-reload" class="hud-center-reload" style="display:none">
+          <div class="reload-panel-header">
+            <span id="hud-reload-title" class="reload-panel-title">ĐANG THAY ĐẠN</span>
+            <span id="hud-reload-pct" class="reload-panel-pct">0%</span>
+          </div>
+          <div class="reload-panel-bar">
+            <div id="hud-reload-fill" class="reload-fill-inner"></div>
+            <div id="hud-reload-glow" class="reload-glow-head"></div>
+          </div>
+          <div id="hud-reload-sub" class="reload-panel-sub">HÃY CHÚ Ý NÉ ĐÒN</div>
+        </div>
+      </div>
       <div id="th-bottom-hud" class="combat-loadout">
         <div class="combat-weapon-info combat-panel"><span class="combat-kicker" id="weapon-name">BLASTER-X</span><div class="combat-ammo"><strong id="th-ammo-cur">16</strong><span>/ <b id="th-ammo-reserve">96</b></span><small>ĐẠN DỰ TRỮ</small></div><div class="combat-meter ammo-meter"><div id="stamina-fill"></div></div><span id="stamina-text">BĂNG ĐẠN 16/16</span></div>
         <button id="th-active-slot" class="combat-slot active" title="Súng chính [1]"><kbd>1</kbd><span id="th-active-silhouette"></span><small>SÚNG</small></button>

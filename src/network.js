@@ -189,7 +189,7 @@ export class NetworkRoom {
             const local = this.game.player;
             const body = {
                 type: 'sync',
-                input: { position: local.position.toArray(), aim: local.aimYaw, revive: !!local.reviveRequested, moving: local.velocity.lengthSq() > 0.1 },
+                input: { position: local.position.toArray(), aim: local.aimYaw, ads: !!local.isADS, revive: !!local.reviveRequested, moving: local.velocity.lengthSq() > 0.1 },
                 commands: this.pendingCommands.slice(0, 30)
             };
             local.reviveRequested = false;
@@ -204,6 +204,7 @@ export class NetworkRoom {
             if (!player || !Array.isArray(input?.position)) continue;
             player.position.fromArray(input.position);
             player.aimYaw = input.aim;
+            player.isADS = !!input.ads;
             player.moving = !!input.moving;
             if (input.revive) this.game.reviveNearest(player);
         }
@@ -214,7 +215,8 @@ export class NetworkRoom {
             const player = this.game.getCoopPlayer(item.player);
             if (!player) continue;
             const connState = this.connections.find(c => c.id === item.player);
-            for (const command of item.commands) {
+            const commands = Array.isArray(item.commands) ? item.commands : (item.command ? [item.command] : []);
+            for (const command of commands) {
                 if (player.isDead || !player.weapons || command.seq <= (player.lastCommandId || 0)) continue;
                 player.lastCommandId = command.seq;
                 if (connState) connState.ack = command.seq;
@@ -233,8 +235,9 @@ export class NetworkRoom {
             if (command.type === 'reload') player.weapons.reload();
             if (command.type === 'switch') player.weapons.switchWeapon(command.slot);
             if (command.type === 'shoot' && Array.isArray(command.target) && command.target.length === 3 && command.target.every(Number.isFinite)) {
+                player.isADS = !!command.ads;
                 const origin = player.weapons.getMuzzlePosition?.() || player.position.clone().add(new THREE.Vector3(0, 1.2, 0));
-                player.weapons.shoot(origin, new THREE.Vector3().fromArray(command.target), !!command.ads, true);
+                player.weapons.shoot(origin, new THREE.Vector3().fromArray(command.target), !!command.ads, true, 1.0, player);
             }
             player.processedSeq = command.seq;
         }
@@ -290,7 +293,7 @@ export function makeRemotePlayer(scene, loader, id, name, characterId = 'soldier
     let action = null;
     let disposed = false;
     let initialized = false;
-    const remote = { id, name, characterId: normalizeCharacter(characterId), position: new THREE.Vector3(0, 0, 8), velocity: new THREE.Vector3(), netTarget: null, netVelocity: new THREE.Vector3(), netSampleTime: 0, aimYaw: Math.PI,
+    const remote = { id, name, characterId: normalizeCharacter(characterId), position: new THREE.Vector3(0, 0, 8), velocity: new THREE.Vector3(), netTarget: null, netVelocity: new THREE.Vector3(), netSampleTime: 0, aimYaw: Math.PI, isADS: false,
         isDead: false, isDowned: false, health: 100, maxHealth: 100, shield: 100, maxShield: 100,
         radius: 0.55, height: 1.6, mesh: group, healthBar,
         updateVisual(delta = 1 / 60) {

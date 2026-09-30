@@ -400,6 +400,12 @@ export class WeaponSystem {
         this.cancelReload();
         this.fireCooldown = 0.18;
         sounds.play('switchWeapon', { volume: 0.7 });
+
+        // Tự động nạp đạn nếu chuyển sang vũ khí đang hết đạn trong băng
+        const nextW = this.getCurrentWeapon();
+        if (nextW && !nextW.isKnife && !nextW.isUtility && (this.ammo[nextW.id] || 0) <= 0 && (this.reserve[nextW.id] || 0) > 0) {
+            this.reload();
+        }
     }
 
     // Cơ chế Channeling sơ cứu vết thương trong 5.0 giây
@@ -654,15 +660,21 @@ export class WeaponSystem {
             return false;
         }
 
-        // Bấm bắn khi đang nạp đạn -> Hủy nạp đạn ngay (Reload Cancel)
+        // Bấm bắn khi đang nạp đạn -> Chỉ Hủy nạp đạn ngay (Reload Cancel) nếu trong băng vẫn còn đạn (> 0)
+        // Nếu băng đạn đã hết (0 viên), giữ nguyên tiến trình nạp đạn không hủy để tránh bị kẹt khi giữ chuột
         if (this.isReloading) {
-            this.cancelReload();
+            if ((this.ammo[current.id] || 0) > 0) {
+                this.cancelReload();
+            }
             return false;
         }
 
         if (this.onCommand && isPlayer) {
             if (this.fireCooldown > 0) return false;
-            if (!current.isKnife && this.ammo[current.id] <= 0) { this.reload(); return false; }
+            if (!current.isKnife && (this.ammo[current.id] || 0) <= 0) {
+                if ((this.reserve[current.id] || 0) > 0) this.reload();
+                return false;
+            }
             this.onCommand({ type: 'shoot', target: targetPoint.toArray(), ads: isADS });
             const send = this.onCommand;
             this.onCommand = null;
@@ -680,9 +692,9 @@ export class WeaponSystem {
             direction.normalize();
             this.fireCooldown = w.fireRate;
             sounds.play('enemyAttack', { volume: 0.5, rate: 1.45 });
-            this.particles.createKnifeSlash(origin, direction, w.color);
+            this.particles?.createKnifeSlash?.(origin, direction, w.color);
 
-            if (playerRef) playerRef.applyKickbackAndShake(w.cursorKick, w.screenShake);
+            if (playerRef?.applyKickbackAndShake) playerRef.applyKickbackAndShake(w.cursorKick, w.screenShake);
 
             this.projectiles.push({
                 meshEntry: null,
@@ -717,12 +729,12 @@ export class WeaponSystem {
         this.currentSpreadDeg = Math.min(w.maxSpreadDeg, this.currentSpreadDeg + (w.recoilSpreadPerShot || 0.8));
 
         // Phản lực con trỏ và rung màn hình (Cursor Kickback & Screen Shake)
-        if (playerRef) {
+        if (playerRef?.applyKickbackAndShake) {
             playerRef.applyKickbackAndShake(w.cursorKick, w.screenShake);
         }
 
         sounds.playShot(w.id);
-        this.particles.createMuzzleFlash(origin, new THREE.Vector3().subVectors(targetPoint, origin).normalize(), w.color);
+        this.particles?.createMuzzleFlash?.(origin, new THREE.Vector3().subVectors(targetPoint, origin).normalize(), w.color);
 
         const beams = isPlayer ? this.beamCount : 1;
         const spreadRad = THREE.MathUtils.degToRad(this.currentSpreadDeg);
@@ -866,6 +878,13 @@ export class WeaponSystem {
                 this.ammo[w.id] = (this.ammo[w.id] || 0) + amount;
                 this.reserve[w.id] -= amount;
                 this.isReloading = false;
+                this.reloadTimer = 0;
+                sounds.playClearJam(); // Âm thanh lên đạn cơ khí giòn giã khi nạp xong
+            }
+        } else {
+            // Cơ chế tự động thay đạn: nếu súng hết đạn trong băng và còn đạn dự trữ mà chưa nạp đạn
+            if (!currentW.isKnife && !currentW.isUtility && (this.ammo[currentW.id] || 0) <= 0 && (this.reserve[currentW.id] || 0) > 0) {
+                this.reload();
             }
         }
 

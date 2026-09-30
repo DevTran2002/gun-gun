@@ -74,6 +74,18 @@ export class UIManager {
         this.bannerText = document.getElementById('announcement-banner');
         this.pickupAlert = document.getElementById('pickup-alert');
 
+        // HUD Loading thay đạn ở giữa màn hình và vòng nạp đạn tâm ngắm
+        this.centerReload = document.getElementById('hud-center-reload');
+        this.centerReloadTitle = document.getElementById('hud-reload-title');
+        this.centerReloadPct = document.getElementById('hud-reload-pct');
+        this.centerReloadFill = document.getElementById('hud-reload-fill');
+        this.centerReloadSub = document.getElementById('hud-reload-sub');
+        this.crosshairReloadRing = document.getElementById('crosshair-reload-ring');
+        this.crosshairReloadBar = document.getElementById('reload-ring-bar');
+        this._reloadRingCircumference = 2 * Math.PI * 22; // Chu vi vòng tròn bán kính 22px (~138.23)
+        this._wasReloading = false;
+        this._reloadHideTimeout = null;
+
         this.bossContainer = document.getElementById('boss-health-container');
         this.bossFill = document.getElementById('boss-health-fill');
 
@@ -311,19 +323,118 @@ export class UIManager {
             if (this.ammoMax) this.ammoMax.textContent = ammoMaxStr;
         }
 
-        // Reload progress bar - Dirty check
-        const reloadKey = `${ammoInfo.isReloading}_${Math.round(ammoInfo.reloadProgress * 100)}`;
+        // Reload progress bar - Cập nhật loading thay đạn ở giữa màn hình và vòng nạp đạn con trỏ ngắm
+        const isReloading = !!ammoInfo.isReloading;
+        const reloadProgress = Math.max(0, Math.min(1.0, ammoInfo.reloadProgress || 0));
+        const reloadPct = Math.round(reloadProgress * 100);
+        const reloadKey = `${isReloading}_${reloadPct}`;
+
         if (reloadKey !== this._lastReloadKey) {
             this._lastReloadKey = reloadKey;
+
             if (this.reloadBar) {
-                if (ammoInfo.isReloading) {
-                    this.reloadBar.style.width = `${Math.round(ammoInfo.reloadProgress * 100)}%`;
+                if (isReloading) {
+                    this.reloadBar.style.width = `${reloadPct}%`;
                     this.reloadBar.classList.add('active');
                 } else {
                     this.reloadBar.style.width = '0%';
                     this.reloadBar.classList.remove('active');
                 }
             }
+
+            // Xử lý hiển thị Widget Loading thay đạn ở giữa màn hình và vòng quay con trỏ ngắm
+            if (isReloading) {
+                if (this._reloadHideTimeout) {
+                    clearTimeout(this._reloadHideTimeout);
+                    this._reloadHideTimeout = null;
+                }
+
+                if (this.centerReload) {
+                    this.centerReload.style.display = 'block';
+                }
+                if (this.crosshairReloadRing) {
+                    this.crosshairReloadRing.classList.add('active');
+                }
+
+                // Cập nhật thanh fill tiến trình
+                if (this.centerReloadFill) {
+                    this.centerReloadFill.style.width = `${reloadPct}%`;
+                }
+                if (this.centerReloadPct) {
+                    this.centerReloadPct.textContent = `${reloadPct}%`;
+                }
+
+                // Cập nhật vòng quay SVG tròn ôm sát con trỏ ngắm
+                if (this.crosshairReloadBar) {
+                    const offset = this._reloadRingCircumference * (1 - reloadProgress);
+                    this.crosshairReloadBar.style.strokeDashoffset = `${offset}px`;
+                }
+
+                // Hiệu ứng phân tầng để người chơi biết rõ sắp thay đạn xong chưa:
+                // Giai đoạn sắp xong (từ 70% trở lên): đổi màu Cyan neon và nhấp nháy phát xung dồn dập
+                if (reloadProgress >= 0.7) {
+                    if (this.centerReload) {
+                        this.centerReload.classList.add('almost-ready');
+                        this.centerReload.classList.remove('ready-burst');
+                    }
+                    if (this.crosshairReloadRing) {
+                        this.crosshairReloadRing.classList.add('almost-ready');
+                        this.crosshairReloadRing.classList.remove('ready-burst');
+                    }
+                    if (this.centerReloadTitle) {
+                        this.centerReloadTitle.textContent = 'SẮP THAY XONG!';
+                    }
+                    if (this.centerReloadSub) {
+                        this.centerReloadSub.textContent = 'CHUẨN BỊ SẴN SÀNG';
+                    }
+                } else {
+                    // Giai đoạn đầu (dưới 70%): màu hổ phách/cam neon ấm áp
+                    if (this.centerReload) {
+                        this.centerReload.classList.remove('almost-ready', 'ready-burst');
+                    }
+                    if (this.crosshairReloadRing) {
+                        this.crosshairReloadRing.classList.remove('almost-ready', 'ready-burst');
+                    }
+                    if (this.centerReloadTitle) {
+                        this.centerReloadTitle.textContent = 'ĐANG THAY ĐẠN...';
+                    }
+                    if (this.centerReloadSub) {
+                        this.centerReloadSub.textContent = 'HÃY CHÚ Ý NÉ ĐÒN';
+                    }
+                }
+            } else if (this._wasReloading) {
+                // Vừa thay đạn xong: Kích hoạt hiệu ứng lóe sáng flash hoàn tất (Ready Burst) trong 220ms
+                if (this.centerReloadFill) this.centerReloadFill.style.width = '100%';
+                if (this.centerReloadPct) this.centerReloadPct.textContent = '100%';
+                if (this.centerReloadTitle) this.centerReloadTitle.textContent = 'ĐÃ LÊN ĐẠN!';
+                if (this.centerReloadSub) this.centerReloadSub.textContent = 'SẴN SÀNG CHIẾN ĐẤU';
+
+                if (this.centerReload) {
+                    this.centerReload.classList.remove('almost-ready');
+                    this.centerReload.classList.add('ready-burst');
+                }
+                if (this.crosshairReloadRing) {
+                    this.crosshairReloadRing.classList.remove('almost-ready');
+                    this.crosshairReloadRing.classList.add('ready-burst');
+                    if (this.crosshairReloadBar) this.crosshairReloadBar.style.strokeDashoffset = '0px';
+                }
+
+                if (this._reloadHideTimeout) clearTimeout(this._reloadHideTimeout);
+                this._reloadHideTimeout = setTimeout(() => {
+                    if (this.centerReload) {
+                        this.centerReload.style.display = 'none';
+                        this.centerReload.classList.remove('ready-burst', 'almost-ready');
+                    }
+                    if (this.crosshairReloadRing) {
+                        this.crosshairReloadRing.classList.remove('active', 'ready-burst', 'almost-ready');
+                        if (this.crosshairReloadBar) {
+                            this.crosshairReloadBar.style.strokeDashoffset = `${this._reloadRingCircumference}px`;
+                        }
+                    }
+                    this._reloadHideTimeout = null;
+                }, 220);
+            }
+            this._wasReloading = isReloading;
         }
 
         // Hotbar 5 Slots Updates - Dirty check

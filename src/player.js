@@ -261,12 +261,13 @@ export class PlayerController {
     }
 
     applyKickbackAndShake(kickStrength = 3.5, shakeStrength = 0.16) {
-        // Đẩy trực tiếp tọa độ tâm ngắm trên màn hình (Cursor Kickback)
-        this.cursorKick.x += (Math.random() - 0.5) * kickStrength * 5.0;
-        this.cursorKick.y -= (Math.random() * 0.7 + 0.3) * kickStrength * 6.5; // Nảy hất nhẹ lên trên
+        if (!this.cursorKick) this.cursorKick = new THREE.Vector2(0, 0);
+        const kick = typeof kickStrength === 'number' ? kickStrength : (kickStrength?.x || 3.5);
+        this.cursorKick.x += (Math.random() - 0.5) * kick * 5.0;
+        this.cursorKick.y -= (Math.random() * 0.7 + 0.3) * kick * 6.5; // Nảy hất nhẹ lên trên
 
         // Rung màn hình dựa trên cỡ đạn (Screen Shake Trauma)
-        this.screenShakeTrauma = Math.min(1.0, this.screenShakeTrauma + (shakeStrength || 0.15));
+        this.screenShakeTrauma = Math.min(1.0, (this.screenShakeTrauma || 0) + (typeof shakeStrength === 'number' ? shakeStrength : 0.15));
     }
 
     getMovementInput() {
